@@ -1,0 +1,23 @@
+using Microsoft.EntityFrameworkCore;
+using Pivot.Models.Entities;
+
+namespace Pivot.Data;
+
+public class PivotDbContext : DbContext
+{
+    public PivotDbContext(DbContextOptions<PivotDbContext> options) : base(options) { }
+
+    public DbSet<Country> Countries => Set<Country>();
+    public DbSet<City> Cities => Set<City>();
+    public DbSet<School> Schools => Set<School>();
+    public DbSet<CourseProgram> Programs => Set<CourseProgram>();
+    public DbSet<PaymentPlan> PaymentPlans => Set<PaymentPlan>();
+    public DbSet<PaymentPlanItem> PaymentPlanItems => Set<PaymentPlanItem>();
+    public DbSet<MainAddOnLink> MainAddOnLinks => Set<MainAddOnLink>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(PivotDbContext).Assembly);
+        base.OnModelCreating(modelBuilder);
+    }
+}

@@ -1,0 +1,11 @@
+## .NET / Visual Studio build çıktıları
+bin/
+obj/
+.vs/
+*.user
+
+## Yerel uygulama ayarları (DB kimlik bilgileri içerir — repoya GİRMEMELİ)
+appsettings.Development.json
+
+## Claude Code yerel ayarları
+.claude/settings.local.json

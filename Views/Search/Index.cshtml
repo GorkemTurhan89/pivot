@@ -1,0 +1,249 @@
+@model Pivot.Models.ViewModels.SearchIndexViewModel
+@{
+    ViewData["Title"] = "Paket Arama";
+}
+
+<h1 class="mb-4">Paket Arama</h1>
+
+<form id="searchForm" class="row g-3">
+    <div class="col-md-3">
+        <label for="countrySelect" class="form-label">Ülke</label>
+        <select id="countrySelect" class="form-select">
+            <option value="">-- Ülke seçiniz --</option>
+            @foreach (var c in Model.Countries)
+            {
+                <option value="@c.Id">@c.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label for="citySelect" class="form-label">Şehir</label>
+        <select id="citySelect" class="form-select" disabled>
+            <option value="">-- Önce ülke seçiniz --</option>
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label for="schoolSelect" class="form-label">Okul</label>
+        <select id="schoolSelect" class="form-select" disabled>
+            <option value="">-- Önce şehir seçiniz --</option>
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label for="programSelect" class="form-label">Program</label>
+        <select id="programSelect" class="form-select" disabled>
+            <option value="">-- Önce okul seçiniz --</option>
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label for="startDate" class="form-label">Başlangıç Tarihi</label>
+        <input type="date" id="startDate" class="form-control" disabled />
+    </div>
+
+    <div class="col-md-3">
+        <label for="lengthFilter" class="form-label">Uzunluk (hafta)</label>
+        <input type="number" id="lengthFilter" class="form-control" list="lengthOptions"
+               placeholder="Tümü" min="1" disabled autocomplete="off" />
+        <datalist id="lengthOptions"></datalist>
+        <small class="form-text text-muted">Listeden seç veya rakam yazıp Enter</small>
+    </div>
+</form>
+
+<hr class="my-4" />
+
+<div id="resultsContainer">
+    <p class="text-muted">Tüm alanları seçtiğinizde uygun paketler burada listelenecek.</p>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const countrySel = document.getElementById('countrySelect');
+            const citySel = document.getElementById('citySelect');
+            const schoolSel = document.getElementById('schoolSelect');
+            const programSel = document.getElementById('programSelect');
+            const startDate = document.getElementById('startDate');
+            const lengthFilter = document.getElementById('lengthFilter');
+            const lengthOptions = document.getElementById('lengthOptions');
+            const results = document.getElementById('resultsContainer');
+
+            let allPlans = [];
+
+            function debounce(fn, delay) {
+                let timer;
+                return (...args) => {
+                    clearTimeout(timer);
+                    timer = setTimeout(() => fn(...args), delay);
+                };
+            }
+
+            function resetSelect(sel, placeholder) {
+                sel.innerHTML = `<option value="">${placeholder}</option>`;
+                sel.disabled = true;
+            }
+
+            function populateSelect(sel, items, placeholder) {
+                sel.innerHTML = `<option value="">${placeholder}</option>` +
+                    items.map(i => `<option value="${i.id}">${i.name}</option>`).join('');
+                sel.disabled = false;
+            }
+
+            async function fetchJson(url) {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            }
+
+            function resetLengthFilter() {
+                lengthFilter.value = '';
+                lengthFilter.disabled = true;
+                lengthOptions.innerHTML = '';
+            }
+
+            function clearAll() {
+                results.innerHTML = '';
+                allPlans = [];
+                resetLengthFilter();
+            }
+
+            countrySel.addEventListener('change', async () => {
+                resetSelect(citySel, '-- Şehir yükleniyor... --');
+                resetSelect(schoolSel, '-- Önce şehir seçiniz --');
+                resetSelect(programSel, '-- Önce okul seçiniz --');
+                startDate.value = '';
+                startDate.disabled = true;
+                clearAll();
+                if (!countrySel.value) {
+                    resetSelect(citySel, '-- Önce ülke seçiniz --');
+                    return;
+                }
+                const cities = await fetchJson(`/Search/GetCities?countryId=${countrySel.value}`);
+                populateSelect(citySel, cities, '-- Şehir seçiniz --');
+            });
+
+            citySel.addEventListener('change', async () => {
+                resetSelect(schoolSel, '-- Okul yükleniyor... --');
+                resetSelect(programSel, '-- Önce okul seçiniz --');
+                startDate.value = '';
+                startDate.disabled = true;
+                clearAll();
+                if (!citySel.value) {
+                    resetSelect(schoolSel, '-- Önce şehir seçiniz --');
+                    return;
+                }
+                const schools = await fetchJson(`/Search/GetSchools?cityId=${citySel.value}`);
+                populateSelect(schoolSel, schools, '-- Okul seçiniz --');
+            });
+
+            schoolSel.addEventListener('change', async () => {
+                resetSelect(programSel, '-- Program yükleniyor... --');
+                startDate.value = '';
+                startDate.disabled = true;
+                clearAll();
+                if (!schoolSel.value) {
+                    resetSelect(programSel, '-- Önce okul seçiniz --');
+                    return;
+                }
+                const programs = await fetchJson(`/Search/GetPrograms?schoolId=${schoolSel.value}`);
+                populateSelect(programSel, programs, '-- Program seçiniz --');
+            });
+
+            programSel.addEventListener('change', () => {
+                startDate.value = '';
+                startDate.disabled = !programSel.value;
+                clearAll();
+            });
+
+            const runPaymentPlanSearch = async () => {
+                clearAll();
+                if (!programSel.value || !startDate.value) return;
+
+                results.innerHTML = '<p class="text-muted">Aranıyor...</p>';
+                allPlans = await fetchJson(`/Search/GetPaymentPlans?programId=${programSel.value}&startDate=${startDate.value}`);
+
+                const uniqueLengths = [...new Set(allPlans.map(p => p.lengthWeeks))].sort((a, b) => a - b);
+                lengthOptions.innerHTML = uniqueLengths.map(w => `<option value="${w}">${w} hafta</option>`).join('');
+                lengthFilter.disabled = uniqueLengths.length === 0;
+
+                renderResults(allPlans);
+            };
+
+            startDate.addEventListener('change', debounce(runPaymentPlanSearch, 600));
+
+            function applyLengthFilter() {
+                const v = lengthFilter.value.trim();
+                if (!v) {
+                    renderResults(allPlans);
+                    return;
+                }
+                const n = parseInt(v, 10);
+                if (isNaN(n)) {
+                    renderResults(allPlans);
+                    return;
+                }
+                renderResults(allPlans.filter(p => p.lengthWeeks === n));
+            }
+
+            lengthFilter.addEventListener('change', applyLengthFilter);
+            lengthFilter.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyLengthFilter();
+                }
+            });
+
+            results.addEventListener('click', (e) => {
+                const btn = e.target.closest('.select-plan');
+                if (!btn) return;
+
+                const selection = {
+                    mainPlanId: parseInt(btn.dataset.planId, 10),
+                    planName: btn.dataset.planName,
+                    countryId: parseInt(countrySel.value, 10),
+                    cityId: parseInt(citySel.value, 10),
+                    schoolId: parseInt(schoolSel.value, 10),
+                    countryName: countrySel.options[countrySel.selectedIndex]?.text ?? '',
+                    cityName: citySel.options[citySel.selectedIndex]?.text ?? '',
+                    schoolName: schoolSel.options[schoolSel.selectedIndex]?.text ?? ''
+                };
+                localStorage.setItem('pivot.selection', JSON.stringify(selection));
+                window.location.href = '/Search/AddOns';
+            });
+
+            function renderResults(plans) {
+                if (!plans || plans.length === 0) {
+                    results.innerHTML = '<div class="alert alert-warning">Seçtiğiniz tarihte sezona sığan paket bulunamadı.</div>';
+                    return;
+                }
+                const rows = plans.map(p => `
+                    <tr>
+                        <td>${p.name}</td>
+                        <td class="text-end">${p.lengthWeeks} hafta</td>
+                        <td>${p.endDate}</td>
+                        <td>${p.validFrom} – ${p.validTo}</td>
+                        <td class="text-end">${p.totalPrice.toLocaleString('tr-TR')} ${p.currency}</td>
+                        <td><button class="btn btn-sm btn-primary select-plan" data-plan-id="${p.id}" data-plan-name="${p.name}">Seç</button></td>
+                    </tr>
+                `).join('');
+                results.innerHTML = `
+                    <table class="table table-striped table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Paket</th>
+                                <th class="text-end">Uzunluk</th>
+                                <th>Bitiş Tarihi</th>
+                                <th>Geçerlilik Aralığı</th>
+                                <th class="text-end">Toplam Fiyat</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+            }
+        })();
+    </script>
+}

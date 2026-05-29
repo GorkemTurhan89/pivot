@@ -1,0 +1,94 @@
+@{
+    ViewData["Title"] = "Sepet";
+}
+
+<h1 class="mb-3">Sepet</h1>
+
+<div id="cartContainer">
+    <p class="text-muted">Yükleniyor...</p>
+</div>
+
+<div class="mt-4">
+    <a href="/Search/AddOns" class="btn btn-outline-secondary">← Ek hizmetlere dön</a>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const container = document.getElementById('cartContainer');
+
+            const rawSel = localStorage.getItem('pivot.selection');
+            if (!rawSel) {
+                container.innerHTML = '<div class="alert alert-warning mb-0">Önce bir ana paket seçmelisiniz.</div>';
+                return;
+            }
+            const sel = JSON.parse(rawSel);
+            const addOnIds = JSON.parse(localStorage.getItem('pivot.selectedAddOns') ?? '[]');
+
+            const money = (v, c) => `${v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${c}`;
+
+            async function load() {
+                const params = new URLSearchParams();
+                params.set('mainPlanId', sel.mainPlanId);
+                addOnIds.forEach(id => params.append('addOnIds', id));
+
+                const res = await fetch(`/Search/GetCart?${params.toString()}`);
+                if (!res.ok) {
+                    container.innerHTML = '<div class="alert alert-danger">Sepet yüklenemedi.</div>';
+                    return;
+                }
+                render(await res.json());
+            }
+
+            function render(c) {
+                const cur = c.currency;
+                const rows = [];
+
+                rows.push(`
+                    <tr>
+                        <td>${c.main.name}</td>
+                        <td class="text-muted">${c.main.weeks} hafta × ${money(c.main.weeklyRate, cur)}</td>
+                        <td class="text-end">${money(c.main.lineTotal, cur)}</td>
+                    </tr>`);
+
+                if (c.registrationFee != null) {
+                    rows.push(`
+                        <tr>
+                            <td>Kayıt Ücreti</td>
+                            <td></td>
+                            <td class="text-end">${money(c.registrationFee, cur)}</td>
+                        </tr>`);
+                }
+
+                c.addOns.forEach(a => {
+                    rows.push(`
+                        <tr>
+                            <td>${a.name} ${a.isMandatory ? '<span class="badge bg-danger ms-1">Zorunlu</span>' : ''}</td>
+                            <td class="text-muted">${a.category ?? ''}</td>
+                            <td class="text-end">${money(a.amount, cur)}</td>
+                        </tr>`);
+                });
+
+                container.innerHTML = `
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Kalem</th>
+                                <th>Detay</th>
+                                <th class="text-end">Tutar</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows.join('')}</tbody>
+                        <tfoot>
+                            <tr class="table-active fw-bold">
+                                <td colspan="2">Toplam</td>
+                                <td class="text-end">${money(c.total, cur)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>`;
+            }
+
+            load();
+        })();
+    </script>
+}

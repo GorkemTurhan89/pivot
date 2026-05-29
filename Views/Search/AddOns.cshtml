@@ -1,0 +1,93 @@
+@{
+    ViewData["Title"] = "Ek Hizmetler";
+}
+
+<h1 class="mb-3">Ek Hizmetler</h1>
+
+<div id="selectionInfo" class="mb-3"></div>
+
+<div id="addOnsContainer">
+    <p class="text-muted">Yükleniyor...</p>
+</div>
+
+<div class="mt-4">
+    <a href="/Search" class="btn btn-outline-secondary">← Paket seçimine dön</a>
+    <button id="continueBtn" class="btn btn-primary" disabled>Sepeti görüntüle</button>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const info = document.getElementById('selectionInfo');
+            const container = document.getElementById('addOnsContainer');
+
+            const raw = localStorage.getItem('pivot.selection');
+            if (!raw) {
+                info.innerHTML = '<div class="alert alert-warning mb-0">Önce bir ana paket seçmelisiniz.</div>';
+                container.innerHTML = '';
+                return;
+            }
+
+            const sel = JSON.parse(raw);
+
+            info.innerHTML = `
+                <div class="alert alert-info mb-0">
+                    <strong>Seçilen paket:</strong> ${sel.planName ?? '-'}
+                    <span class="text-muted">— ${sel.schoolName ?? ''}, ${sel.cityName ?? ''} / ${sel.countryName ?? ''}</span>
+                </div>`;
+
+            const continueBtn = document.getElementById('continueBtn');
+            continueBtn.disabled = false;
+            continueBtn.addEventListener('click', () => {
+                const ids = [...document.querySelectorAll('.addon-check:checked')].map(c => parseInt(c.value, 10));
+                localStorage.setItem('pivot.selectedAddOns', JSON.stringify(ids));
+                window.location.href = '/Search/Cart';
+            });
+
+            async function load() {
+                const res = await fetch(`/Search/GetAddOns?schoolId=${sel.schoolId}&mainPlanId=${sel.mainPlanId}`);
+                if (!res.ok) {
+                    container.innerHTML = '<div class="alert alert-danger">Ek hizmetler yüklenemedi.</div>';
+                    return;
+                }
+                render(await res.json());
+            }
+
+            function render(addOns) {
+                if (!addOns || addOns.length === 0) {
+                    container.innerHTML = '<p class="text-muted">Bu paket için ek hizmet bulunmuyor.</p>';
+                    return;
+                }
+                const rows = addOns.map(a => `
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="form-check-input addon-check"
+                                   value="${a.id}" ${a.isMandatory ? 'checked disabled' : ''} />
+                        </td>
+                        <td>
+                            ${a.name}
+                            ${a.isMandatory ? '<span class="badge bg-danger ms-1">Zorunlu</span>' : ''}
+                        </td>
+                        <td>${a.category ?? ''}</td>
+                        <td class="text-end">${a.price.toLocaleString('tr-TR')} ${a.currency}</td>
+                    </tr>`).join('');
+
+                container.innerHTML = `
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width:3rem;"></th>
+                                <th>Hizmet</th>
+                                <th>Kategori</th>
+                                <th class="text-end">Fiyat</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                    <small class="text-muted">Zorunlu hizmetler otomatik seçilidir ve kaldırılamaz.</small>`;
+            }
+
+            load();
+        })();
+    </script>
+}
