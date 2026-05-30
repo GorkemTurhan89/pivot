@@ -76,6 +76,17 @@
             const todayStr = new Date().toISOString().slice(0, 10);
             if (!startDate.value) startDate.value = todayStr;
 
+            // ?fresh=1 ile geldiyse cart oturumunu temizle (lead hariç — varsa kalsın,
+            // yeni paket arama aynı lead'e bağlanır).
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('fresh') === '1') {
+                ['pivot.selection', 'pivot.selectedAddOns', 'pivot.addOnWeeks']
+                    .forEach(k => localStorage.removeItem(k));
+                urlParams.delete('fresh');
+                const cleanUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+                window.history.replaceState({}, '', cleanUrl);
+            }
+
             function debounce(fn, delay) {
                 let timer;
                 return (...args) => {
@@ -225,6 +236,10 @@
                     cityName: citySel.options[citySel.selectedIndex]?.text ?? '',
                     schoolName: schoolSel.options[schoolSel.selectedIndex]?.text ?? ''
                 };
+                // BUG FIX: yeni ana paket seçildiğinde önceki addon seçimleri başka okuldan
+                // kalmış olabilir (stale). Sıfırla.
+                localStorage.removeItem('pivot.selectedAddOns');
+                localStorage.removeItem('pivot.addOnWeeks');
                 localStorage.setItem('pivot.selection', JSON.stringify(selection));
                 window.location.href = '/Search/AddOns';
             });

@@ -1,8 +1,138 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@{
+    ViewData["Title"] = "Sepet Takip";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Sepet Takip</h1>
+    <div class="d-flex gap-2 align-items-center">
+        <label for="statusFilter" class="form-label mb-0 me-2">Status:</label>
+        <select id="statusFilter" class="form-select form-select-sm" style="width:auto;">
+            <option value="">Hepsi</option>
+            <option value="LeadCreated">LeadCreated</option>
+            <option value="OfferCreated">OfferCreated</option>
+        </select>
+    </div>
 </div>
+
+<div id="cartsContainer">
+    <p class="text-muted">Yükleniyor...</p>
+</div>
+
+<div class="text-center my-3">
+    <button id="loadMoreBtn" class="btn btn-outline-secondary d-none">50 daha göster</button>
+    <div id="endNote" class="text-muted small d-none">Hepsi bu kadar.</div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const PAGE = 50;
+            const container = document.getElementById('cartsContainer');
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+            const endNote = document.getElementById('endNote');
+            const filter = document.getElementById('statusFilter');
+
+            let skip = 0;
+            let currentStatus = '';
+            let table = null;
+
+            const fmtMoney = v => Number(v ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const fmtDate = s => {
+                if (!s) return '';
+                const d = new Date(s);
+                if (isNaN(d)) return s;
+                return d.toLocaleString('tr-TR');
+            };
+            const esc = s => String(s ?? '').replace(/</g, '&lt;');
+            const statusBadge = s => {
+                if (s === 'LeadCreated') return '<span class="badge bg-secondary">LeadCreated</span>';
+                if (s === 'OfferCreated') return '<span class="badge bg-success">OfferCreated</span>';
+                return `<span class="badge bg-light text-dark">${esc(s)}</span>`;
+            };
+
+            function buildEmptyTable() {
+                container.innerHTML = `
+                    <table class="table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Müşteri</th>
+                                <th>E-posta</th>
+                                <th>Telefon</th>
+                                <th>Uyruk</th>
+                                <th>Oluşturma</th>
+                                <th>Son Güncelleme</th>
+                                <th>Status</th>
+                                <th class="text-end">Toplam</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>`;
+                table = container.querySelector('tbody');
+            }
+
+            function appendRows(items) {
+                if (!table) buildEmptyTable();
+                if (items.length === 0 && skip === 0) {
+                    container.innerHTML = '<div class="alert alert-info">Kayıt bulunmuyor.</div>';
+                    return;
+                }
+                const html = items.map(c => `
+                    <tr>
+                        <td>${c.id}</td>
+                        <td>${esc(c.memberName)}</td>
+                        <td>${esc(c.email ?? '—')}</td>
+                        <td>${esc(c.phoneNumber ?? '—')}</td>
+                        <td>${esc(c.nationality)}</td>
+                        <td><small>${fmtDate(c.createDate)}</small></td>
+                        <td><small>${fmtDate(c.updateDate)}</small></td>
+                        <td>${statusBadge(c.status)}</td>
+                        <td class="text-end">${fmtMoney(c.totalPaymentPrice)}</td>
+                    </tr>`).join('');
+                table.insertAdjacentHTML('beforeend', html);
+            }
+
+            async function loadPage() {
+                loadMoreBtn.disabled = true;
+                const params = new URLSearchParams();
+                params.set('skip', skip);
+                params.set('take', PAGE);
+                if (currentStatus) params.set('status', currentStatus);
+
+                const res = await fetch(`/Home/GetCarts?${params.toString()}`);
+                if (!res.ok) {
+                    container.innerHTML = '<div class="alert alert-danger">Liste yüklenemedi.</div>';
+                    return;
+                }
+                const items = await res.json();
+                appendRows(items);
+                skip += items.length;
+
+                if (items.length < PAGE) {
+                    loadMoreBtn.classList.add('d-none');
+                    endNote.classList.remove('d-none');
+                } else {
+                    loadMoreBtn.classList.remove('d-none');
+                    endNote.classList.add('d-none');
+                }
+                loadMoreBtn.disabled = false;
+            }
+
+            function resetAndLoad() {
+                skip = 0;
+                table = null;
+                container.innerHTML = '<p class="text-muted">Yükleniyor...</p>';
+                endNote.classList.add('d-none');
+                loadPage();
+            }
+
+            filter.addEventListener('change', () => {
+                currentStatus = filter.value;
+                resetAndLoad();
+            });
+            loadMoreBtn.addEventListener('click', loadPage);
+
+            resetAndLoad();
+        })();
+    </script>
+}

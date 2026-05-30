@@ -16,8 +16,7 @@ public class LeadController : Controller
         _db = db;
     }
 
-    // /, /leadRegister, /Lead/Register hepsi buraya çıksın.
-    [HttpGet("/")]
+    // /leadRegister ve /Lead/Register buraya çıksın (ana sayfa Home'da).
     [HttpGet("/leadRegister")]
     [HttpGet]   // /Lead/Register
     public IActionResult Register() => View();

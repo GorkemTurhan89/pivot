@@ -93,6 +93,10 @@
 @section Scripts {
     <script>
         (function () {
+            // Yeni lead başlangıcı: önceki cart oturumunun izlerini temizle.
+            ['pivot.lead', 'pivot.selection', 'pivot.selectedAddOns', 'pivot.addOnWeeks']
+                .forEach(k => localStorage.removeItem(k));
+
             const form = document.getElementById('leadForm');
             const f = id => document.getElementById(id);
             const nameRe = /^[\p{L}\s]+$/u;          // sadece harf + boşluk (Unicode)

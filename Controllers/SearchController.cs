@@ -242,7 +242,7 @@ public class SearchController : Controller
     [HttpGet]
     public async Task<IActionResult> GetCart(int mainPlanId, int weeks, DateOnly startDate,
         [FromQuery] List<int> addOnIds, [FromQuery] string? addOnWeeksJson = null,
-        [FromQuery] int? cartDetailId = null)
+        [FromQuery] Guid? cartGuid = null)
     {
         // Weekly addon'ların hafta override'ları: {addonId: weeks} JSON. Yoksa ana paket hafta'sı kullanılır.
         var addOnWeeksMap = string.IsNullOrEmpty(addOnWeeksJson)
@@ -351,12 +351,13 @@ public class SearchController : Controller
         var total = courseFinal + registration
                     + addOnLines.Sum(l => l.Amount + (l.RegistrationFee ?? 0m));
 
-        // CRM snapshot: cartDetailId varsa CartDetail OfferCreated'a evrilir ve
+        // CRM snapshot: cartGuid varsa CartDetail OfferCreated'a evrilir ve
         // seçili planlar ChoosenPlanDetails'a yazılır (mevcut snapshot silinir, yenisi yazılır).
-        if (cartDetailId.HasValue)
+        // CartGuid (sequential int yerine) ileri/geri navigasyon arası aynı sepeti güncel tutar.
+        if (cartGuid.HasValue)
         {
             var cart = await _db.CartDetails.Include(c => c.ChoosenPlans)
-                .FirstOrDefaultAsync(c => c.Id == cartDetailId.Value);
+                .FirstOrDefaultAsync(c => c.CartGuid == cartGuid.Value);
             if (cart != null)
             {
                 cart.Status = CartStatus.OfferCreated;
