@@ -1,0 +1,200 @@
+@{
+    ViewData["Title"] = "Kayıt";
+    var maxDate = DateTime.Today.ToString("yyyy-MM-dd");
+}
+
+<h1 class="mb-3">Yeni Kayıt</h1>
+
+<form id="leadForm" class="row g-3" novalidate>
+    <div class="col-md-6">
+        <label for="firstName" class="form-label">Ad <span class="text-danger">*</span></label>
+        <input type="text" id="firstName" class="form-control" required autocomplete="given-name" />
+        <div class="invalid-feedback">Ad boş olamaz; sadece harf ve boşluk içerebilir.</div>
+    </div>
+    <div class="col-md-6">
+        <label for="lastName" class="form-label">Soyad <span class="text-danger">*</span></label>
+        <input type="text" id="lastName" class="form-control" required autocomplete="family-name" />
+        <div class="invalid-feedback">Soyad boş olamaz; sadece harf ve boşluk içerebilir.</div>
+    </div>
+
+    <div class="col-md-4">
+        <label for="birthday" class="form-label">Doğum Tarihi <span class="text-danger">*</span></label>
+        <input type="date" id="birthday" class="form-control" required max="@maxDate" />
+        <div class="invalid-feedback">Geçerli bir doğum tarihi girin.</div>
+    </div>
+    <div class="col-md-4">
+        <label for="personalId" class="form-label">TC / Pasaport No</label>
+        <input type="text" id="personalId" class="form-control" autocomplete="off" />
+        <small class="text-muted">Opsiyonel</small>
+    </div>
+    <div class="col-md-4">
+        <label for="nationality" class="form-label">Uyruk <span class="text-danger">*</span></label>
+        <select id="nationality" class="form-select" required>
+            <option value="">— Seçiniz —</option>
+            @foreach (var n in new[] {
+                "Türkiye", "KKTC", "Almanya", "Hollanda", "Avusturya", "Belçika",
+                "Fransa", "İngiltere", "Amerika Birleşik Devletleri", "Kanada",
+                "Avustralya", "İrlanda", "İsviçre", "İtalya", "İspanya", "Yunanistan",
+                "Bulgaristan", "Romanya", "Rusya", "Ukrayna", "Azerbaycan",
+                "Kazakistan", "Özbekistan", "Türkmenistan", "Kırgızistan",
+                "Mısır", "Suudi Arabistan", "Birleşik Arap Emirlikleri", "Katar",
+                "Hindistan", "Pakistan", "Çin", "Japonya", "Güney Kore", "Diğer"
+            })
+            {
+                <option value="@n">@n</option>
+            }
+        </select>
+        <div class="invalid-feedback">Uyruk seçimi zorunludur.</div>
+    </div>
+
+    <div class="col-md-6">
+        <label for="phone" class="form-label">Telefon <span class="text-danger">*</span></label>
+        <div class="input-group">
+            <span class="input-group-text">+</span>
+            <input type="tel" id="phone" class="form-control" required
+                   placeholder="905551234567" inputmode="numeric" autocomplete="tel" />
+        </div>
+        <div class="invalid-feedback">Sadece rakam, min 7 hane.</div>
+    </div>
+    <div class="col-md-6">
+        <label for="email" class="form-label">E-posta <span class="text-danger">*</span></label>
+        <input type="email" id="email" class="form-control" required autocomplete="email" />
+        <div class="invalid-feedback">Geçerli bir e-posta girin.</div>
+    </div>
+
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Kaydet ve Paket Aramaya Geç</button>
+    </div>
+</form>
+
+<div class="modal fade" id="dupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Mevcut Kayıt Bulundu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="dupMessage" class="mb-3"></p>
+                <button type="button" id="showDetailBtn" class="btn btn-outline-primary btn-sm">Detayı göster</button>
+                <div id="dupDetail" class="mt-3 d-none">
+                    <table class="table table-sm mb-0">
+                        <tbody id="dupDetailBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const form = document.getElementById('leadForm');
+            const f = id => document.getElementById(id);
+            const nameRe = /^[\p{L}\s]+$/u;          // sadece harf + boşluk (Unicode)
+            const phoneRe = /^[0-9]{7,15}$/;
+            const emailRe = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/;
+
+            // Ad/Soyad input: rakam ve noktalama yazımını engelle, sonradan trim.
+            ['firstName', 'lastName'].forEach(id => {
+                const el = f(id);
+                el.addEventListener('input', () => {
+                    // Sadece harf ve boşluk bırak.
+                    const cleaned = el.value.replace(/[^\p{L}\s]/gu, '');
+                    if (cleaned !== el.value) el.value = cleaned;
+                });
+            });
+
+            // Phone input: sadece rakam.
+            f('phone').addEventListener('input', () => {
+                const cleaned = f('phone').value.replace(/[^0-9]/g, '');
+                if (cleaned !== f('phone').value) f('phone').value = cleaned;
+            });
+
+            function validate() {
+                let ok = true;
+                const setValid = (id, valid) => {
+                    f(id).classList.toggle('is-invalid', !valid);
+                    if (!valid) ok = false;
+                };
+
+                const fn = f('firstName').value.trim();
+                setValid('firstName', fn.length > 0 && nameRe.test(fn));
+                const ln = f('lastName').value.trim();
+                setValid('lastName', ln.length > 0 && nameRe.test(ln));
+                setValid('birthday', !!f('birthday').value);
+                setValid('nationality', !!f('nationality').value);
+                setValid('phone', phoneRe.test(f('phone').value));
+                setValid('email', emailRe.test(f('email').value.trim()));
+                return ok;
+            }
+
+            const dupModalEl = document.getElementById('dupModal');
+            const dupModal = new bootstrap.Modal(dupModalEl);
+            const dupMessage = document.getElementById('dupMessage');
+            const dupDetail = document.getElementById('dupDetail');
+            const dupDetailBody = document.getElementById('dupDetailBody');
+            const showDetailBtn = document.getElementById('showDetailBtn');
+
+            showDetailBtn.addEventListener('click', () => {
+                dupDetail.classList.remove('d-none');
+                showDetailBtn.classList.add('d-none');
+            });
+
+            function showDuplicate(field, member) {
+                const label = field === 'email' ? 'E-posta' : 'Telefon';
+                dupMessage.textContent = `${label} bilgisiyle daha önce kayıt yapılmış. Aynı bilgi ile yeni kayıt oluşturulamaz.`;
+                dupDetail.classList.add('d-none');
+                showDetailBtn.classList.remove('d-none');
+                dupDetailBody.innerHTML = `
+                    <tr><th>Ad Soyad</th><td>${esc(member.firstName)} ${esc(member.lastName)}</td></tr>
+                    <tr><th>Doğum</th><td>${esc(member.birthday)}</td></tr>
+                    <tr><th>Uyruk</th><td>${esc(member.nationality)}</td></tr>
+                    <tr><th>TC/Pasaport</th><td>${esc(member.personalId ?? '—')}</td></tr>
+                    <tr><th>E-posta</th><td>${esc(member.email ?? '—')}</td></tr>
+                    <tr><th>Telefon</th><td>${esc(member.phoneNumber ?? '—')}</td></tr>
+                    <tr><th>Kayıt</th><td>${esc(member.createdAt)}</td></tr>`;
+                dupModal.show();
+            }
+
+            function esc(s) { return String(s ?? '').replace(/</g, '&lt;'); }
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!validate()) return;
+
+                const payload = {
+                    firstName: f('firstName').value.trim(),
+                    lastName: f('lastName').value.trim(),
+                    personalId: f('personalId').value.trim() || null,
+                    nationality: f('nationality').value,
+                    birthday: f('birthday').value,
+                    phoneNumber: '+' + f('phone').value,
+                    email: f('email').value.trim()
+                };
+
+                const res = await fetch('/Lead/Save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.status === 409) {
+                    const data = await res.json();
+                    showDuplicate(data.duplicateField, data.existingMember);
+                    return;
+                }
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    alert(data.error ?? 'Kayıt oluşturulamadı.');
+                    return;
+                }
+                window.location.href = '/Search';
+            });
+        })();
+    </script>
+}
