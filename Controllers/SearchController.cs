@@ -90,12 +90,19 @@ public class SearchController : Controller
                 p.WeeklyPromoFee,
                 p.TotalListFee,
                 p.TotalPromoFee,
+                p.PromoValidFrom,
+                p.PromoValidUntil,
                 Currency = p.School.City.Country.Currency
             })
             .ToListAsync();
 
         var plans = raw.Select(p =>
         {
+            // Kayıt tarihi (startDate) promo penceresi içinde değilse promo gösterilmez.
+            bool inPromoWindow =
+                (!p.PromoValidFrom.HasValue || p.PromoValidFrom.Value <= startDate)
+                && (!p.PromoValidUntil.HasValue || startDate <= p.PromoValidUntil.Value);
+
             decimal listUnit;
             decimal? promoUnit;
             decimal? listTotal = null;
@@ -103,7 +110,7 @@ public class SearchController : Controller
             if (p.PriceType == PriceType.Weekly)
             {
                 listUnit = p.WeeklyListFee ?? 0m;
-                promoUnit = p.WeeklyPromoFee;
+                promoUnit = inPromoWindow ? p.WeeklyPromoFee : null;
                 if (weeks.HasValue && weeks.Value > 0)
                 {
                     listTotal = listUnit * weeks.Value;
@@ -113,7 +120,7 @@ public class SearchController : Controller
             else
             {
                 listUnit = p.TotalListFee ?? 0m;
-                promoUnit = p.TotalPromoFee;
+                promoUnit = inPromoWindow ? p.TotalPromoFee : null;
                 listTotal = listUnit;
                 promoTotal = promoUnit;
             }
@@ -218,7 +225,7 @@ public class SearchController : Controller
     // BÜYÜK GEÇİŞ (2026-05-30): kurs tutarı bant fiyatından hesaplanıyor.
     // weeks parametresi zorunlu — kullanıcı seçim ekranında girdiği hafta sayısı.
     [HttpGet]
-    public async Task<IActionResult> GetCart(int mainPlanId, int weeks, [FromQuery] List<int> addOnIds)
+    public async Task<IActionResult> GetCart(int mainPlanId, int weeks, DateOnly startDate, [FromQuery] List<int> addOnIds)
     {
         var main = await _db.PaymentPlans
             .Where(p => p.Id == mainPlanId && p.PackageType == PackageType.Main)
@@ -230,6 +237,8 @@ public class SearchController : Controller
                 p.WeeklyPromoFee,
                 p.TotalListFee,
                 p.TotalPromoFee,
+                p.PromoValidFrom,
+                p.PromoValidUntil,
                 p.RegistrationFee,
                 Currency = p.School.City.Country.Currency
             })
@@ -238,13 +247,18 @@ public class SearchController : Controller
         if (main == null)
             return NotFound();
 
+        // Kayıt tarihi promo penceresi içinde değilse promo geçersiz; toplam liste fiyatından hesaplanır.
+        bool inPromoWindow =
+            (!main.PromoValidFrom.HasValue || main.PromoValidFrom.Value <= startDate)
+            && (!main.PromoValidUntil.HasValue || startDate <= main.PromoValidUntil.Value);
+
         decimal courseList;
         decimal courseFinal;
         decimal weeklyRate;
         if (main.PriceType == PriceType.Weekly)
         {
             var listFee = main.WeeklyListFee ?? 0m;
-            var promoFee = main.WeeklyPromoFee;
+            var promoFee = inPromoWindow ? main.WeeklyPromoFee : null;
             courseList = listFee * weeks;
             courseFinal = (promoFee ?? listFee) * weeks;
             weeklyRate = promoFee ?? listFee;
@@ -252,7 +266,7 @@ public class SearchController : Controller
         else
         {
             var listTotal = main.TotalListFee ?? 0m;
-            var promoTotal = main.TotalPromoFee;
+            var promoTotal = inPromoWindow ? main.TotalPromoFee : null;
             courseList = listTotal;
             courseFinal = promoTotal ?? listTotal;
             weeklyRate = weeks > 0 ? courseFinal / weeks : courseFinal;

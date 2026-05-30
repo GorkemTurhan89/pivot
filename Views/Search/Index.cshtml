@@ -39,8 +39,9 @@
     </div>
 
     <div class="col-md-3">
-        <label for="startDate" class="form-label">Başlangıç Tarihi</label>
-        <input type="date" id="startDate" class="form-control" disabled />
+        <label for="startDate" class="form-label">Kayıt Tarihi</label>
+        <input type="date" id="startDate" class="form-control"
+               value="@DateTime.Today.ToString("yyyy-MM-dd")" disabled />
     </div>
 
     <div class="col-md-3">
@@ -71,6 +72,9 @@
             const results = document.getElementById('resultsContainer');
 
             let allPlans = [];
+            // Kayıt tarihi default'u bugün; cascading değişimlerde sıfırlanmamalı.
+            const todayStr = new Date().toISOString().slice(0, 10);
+            if (!startDate.value) startDate.value = todayStr;
 
             function debounce(fn, delay) {
                 let timer;
@@ -113,7 +117,7 @@
                 resetSelect(citySel, '-- Şehir yükleniyor... --');
                 resetSelect(schoolSel, '-- Önce şehir seçiniz --');
                 resetSelect(programSel, '-- Önce okul seçiniz --');
-                startDate.value = '';
+                startDate.value = todayStr;
                 startDate.disabled = true;
                 clearAll();
                 if (!countrySel.value) {
@@ -127,7 +131,7 @@
             citySel.addEventListener('change', async () => {
                 resetSelect(schoolSel, '-- Okul yükleniyor... --');
                 resetSelect(programSel, '-- Önce okul seçiniz --');
-                startDate.value = '';
+                startDate.value = todayStr;
                 startDate.disabled = true;
                 clearAll();
                 if (!citySel.value) {
@@ -140,7 +144,7 @@
 
             schoolSel.addEventListener('change', async () => {
                 resetSelect(programSel, '-- Program yükleniyor... --');
-                startDate.value = '';
+                startDate.value = todayStr;
                 startDate.disabled = true;
                 clearAll();
                 if (!schoolSel.value) {
@@ -152,7 +156,7 @@
             });
 
             programSel.addEventListener('change', () => {
-                startDate.value = '';
+                startDate.value = todayStr;
                 startDate.disabled = !programSel.value;
                 clearAll();
             });
@@ -210,6 +214,7 @@
                     mainPlanId: parseInt(btn.dataset.planId, 10),
                     planName: btn.dataset.planName,
                     weeks: weeks,
+                    startDate: startDate.value,
                     countryId: parseInt(countrySel.value, 10),
                     cityId: parseInt(citySel.value, 10),
                     schoolId: parseInt(schoolSel.value, 10),
