@@ -1,0 +1,171 @@
+@{
+    ViewData["Title"] = "Ek Hizmetler (Vize / Uçak)";
+}
+
+<h1 class="mb-3">Ek Hizmetler (Vize / Uçak Bileti)</h1>
+
+<div id="selectionInfo" class="mb-3"></div>
+
+<div id="extrasContainer">
+    <p class="text-muted">Yükleniyor...</p>
+</div>
+
+<div class="mt-3 mb-4">
+    <button id="addManualBtn" class="btn btn-outline-secondary btn-sm">+ Manuel kalem ekle</button>
+    <small class="text-muted ms-2">Sadece bu sepete eklenir, katalogu değiştirmez.</small>
+</div>
+
+<div class="mt-4">
+    <a href="/Search/AddOns" class="btn btn-outline-secondary">← Ek hizmetlere dön</a>
+    <button id="continueBtn" class="btn btn-primary">Sepeti görüntüle</button>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const info = document.getElementById('selectionInfo');
+            const container = document.getElementById('extrasContainer');
+            const continueBtn = document.getElementById('continueBtn');
+            const addManualBtn = document.getElementById('addManualBtn');
+
+            const raw = localStorage.getItem('pivot.selection');
+            if (!raw) {
+                info.innerHTML = '<div class="alert alert-warning mb-0">Önce bir ana paket seçmelisiniz.</div>';
+                container.innerHTML = '';
+                continueBtn.disabled = true;
+                addManualBtn.disabled = true;
+                return;
+            }
+            const sel = JSON.parse(raw);
+
+            info.innerHTML = `
+                <div class="alert alert-info mb-0">
+                    <strong>Seçilen paket:</strong> ${sel.planName ?? '-'}
+                    <span class="text-muted">— ${sel.schoolName ?? ''}, ${sel.cityName ?? ''} / ${sel.countryName ?? ''}</span>
+                </div>`;
+
+            const esc = s => String(s ?? '').replace(/</g, '&lt;');
+            const fmt = v => Number(v ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            async function load() {
+                const res = await fetch(`/Search/GetExtraServices?countryId=${sel.countryId}`);
+                if (!res.ok) {
+                    container.innerHTML = '<div class="alert alert-danger">Liste yüklenemedi.</div>';
+                    return;
+                }
+                render(await res.json());
+            }
+
+            function render(items) {
+                container.innerHTML = `
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width:3rem;"></th>
+                                <th>Hizmet</th>
+                                <th>Vize Tipi</th>
+                                <th>Default</th>
+                                <th style="width:10rem;">Tutar</th>
+                                <th style="width:5rem;">Birim</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="extrasBody"></tbody>
+                    </table>
+                    <small class="text-muted">Default sütunundaki aralık Excel referansıdır; sepete giden değer Tutar input'undakidir.</small>`;
+
+                const body = document.getElementById('extrasBody');
+                if (items.length === 0) {
+                    body.innerHTML = `<tr><td colspan="7" class="text-muted">Bu ülke için kataloğa eklenmiş ek hizmet bulunmuyor. Manuel kalem ekleyebilirsiniz.</td></tr>`;
+                    return;
+                }
+                items.forEach(x => body.insertAdjacentHTML('beforeend', renderRow(x)));
+            }
+
+            function renderRow(x) {
+                // Önceden tanımlı ExtraService satırı
+                return `
+                <tr data-id="${x.id}" data-source="extra" data-category="${esc(x.category)}" data-name="${esc(x.name)}">
+                    <td><input type="checkbox" class="form-check-input extra-check"></td>
+                    <td>${esc(x.name)}</td>
+                    <td><small class="text-muted">${esc(x.visaType ?? '—')}</small></td>
+                    <td><small class="text-muted">${esc(x.defaultPriceText)}</small></td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm extra-amount"
+                               value="${x.defaultPrice ?? 0}" min="0" step="0.01">
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark extra-currency" data-currency="${esc(x.currency)}">${esc(x.currency)}</span>
+                    </td>
+                    <td></td>
+                </tr>`;
+            }
+
+            function renderManualRow() {
+                const cur = sel.countryName ? '' : '';
+                return `
+                <tr data-source="manual">
+                    <td><input type="checkbox" class="form-check-input extra-check" checked></td>
+                    <td colspan="2">
+                        <input type="text" class="form-control form-control-sm extra-name" placeholder="Hizmet adı (örn. Konsolosluk dosya hazırlık)">
+                    </td>
+                    <td><small class="text-muted">manuel</small></td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm extra-amount"
+                               value="0" min="0" step="0.01">
+                    </td>
+                    <td>
+                        <select class="form-select form-select-sm extra-currency-input">
+                            <option>TRY</option>
+                            <option>USD</option>
+                            <option>EUR</option>
+                            <option>GBP</option>
+                            <option>CAD</option>
+                            <option>AUD</option>
+                        </select>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-link text-danger remove-manual" title="Kaldır">×</button>
+                    </td>
+                </tr>`;
+            }
+
+            addManualBtn.addEventListener('click', () => {
+                const body = document.getElementById('extrasBody');
+                if (!body) return;
+                body.insertAdjacentHTML('beforeend', renderManualRow());
+                // remove handler
+                body.lastElementChild.querySelector('.remove-manual').addEventListener('click', (e) => {
+                    e.target.closest('tr').remove();
+                });
+            });
+
+            continueBtn.addEventListener('click', () => {
+                const extras = [];
+                document.querySelectorAll('#extrasBody tr').forEach(tr => {
+                    const cb = tr.querySelector('.extra-check');
+                    if (!cb || !cb.checked) return;
+                    const source = tr.dataset.source;
+                    const amount = parseFloat(tr.querySelector('.extra-amount').value);
+                    if (isNaN(amount) || amount <= 0) return;
+                    if (source === 'extra') {
+                        const id = parseInt(tr.dataset.id, 10);
+                        const name = tr.dataset.name;
+                        const category = tr.dataset.category;
+                        const currency = tr.querySelector('.extra-currency').dataset.currency;
+                        extras.push({ id, name, category, amount, currency });
+                    } else {
+                        const name = tr.querySelector('.extra-name').value.trim();
+                        if (!name) return;
+                        const currency = tr.querySelector('.extra-currency-input').value;
+                        extras.push({ id: null, name, category: 'Manuel', amount, currency });
+                    }
+                });
+                localStorage.setItem('pivot.extras', JSON.stringify(extras));
+                window.location.href = '/Search/Cart';
+            });
+
+            load();
+        })();
+    </script>
+}

@@ -52,7 +52,8 @@ public class PaymentPlanConfiguration : IEntityTypeConfiguration<PaymentPlan>
         builder.HasOne(p => p.School)
             .WithMany(s => s.PaymentPlans)
             .HasForeignKey(p => p.SchoolId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);   // ExtraServices okula bağlı değil
 
         builder.HasOne(p => p.Program)
             .WithMany(pr => pr.PaymentPlans)

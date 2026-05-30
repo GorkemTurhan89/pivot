@@ -4,8 +4,9 @@ public class PaymentPlan
 {
     public int Id { get; set; }
 
-    public int SchoolId { get; set; }
-    public School School { get; set; } = null!;
+    // ExtraServices (Vize / Uçak Bileti) gibi okula bağlı olmayan AddOn'lar için null olabilir.
+    public int? SchoolId { get; set; }
+    public School? School { get; set; }
 
     public int? ProgramId { get; set; }
     public CourseProgram? Program { get; set; }

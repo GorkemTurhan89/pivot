@@ -12,7 +12,7 @@
 
 <div class="mt-4">
     <a href="/Search" class="btn btn-outline-secondary">← Paket seçimine dön</a>
-    <button id="continueBtn" class="btn btn-primary" disabled>Sepeti görüntüle</button>
+    <button id="continueBtn" class="btn btn-primary" disabled>Devam (Ek Hizmetler)</button>
 </div>
 
 <div class="modal fade" id="conditionModal" tabindex="-1" aria-hidden="true">
@@ -75,7 +75,7 @@
                 });
                 localStorage.setItem('pivot.selectedAddOns', JSON.stringify(ids));
                 localStorage.setItem('pivot.addOnWeeks', JSON.stringify(weeksMap));
-                window.location.href = '/Search/Cart';
+                window.location.href = '/Search/ExtraServices';
             });
 
             const fmt = v => Number(v).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

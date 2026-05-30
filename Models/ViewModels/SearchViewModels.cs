@@ -42,6 +42,18 @@ public class AddOnListItemViewModel
     public bool IsMandatory { get; set; }
 }
 
+// ExtraServices (Vize / Uçak Bileti) sayfası için katalog kaydı.
+public class ExtraServiceListItemViewModel
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;   // "Vize" / "UçakBileti"
+    public string? VisaType { get; set; }
+    public decimal? DefaultPrice { get; set; }              // parse edilen alt sınır
+    public string DefaultPriceText { get; set; } = string.Empty;  // Excel'deki ham referans
+    public string Currency { get; set; } = string.Empty;
+}
+
 // Bir accommodation seçildiğinde dinamik olarak getirilen supplement satırı.
 public class SupplementListItemViewModel
 {
@@ -64,8 +76,20 @@ public class CartViewModel
     public CartMainLine Main { get; set; } = new();
     public decimal? RegistrationFee { get; set; }
     public List<CartAddOnLine> AddOns { get; set; } = new();
+    // ExtraServices (Vize / UçakBileti) + manuel kalemler. UI'da addon'lardan ayrı blokta.
+    public List<CartAddOnLine> Extras { get; set; } = new();
     public decimal Total { get; set; }
     public string Currency { get; set; } = "GBP";
+}
+
+// ExtraServices submit'inden gelen JSON kalemler (manuel veya ExtraService).
+public class CartExtraInput
+{
+    public int? Id { get; set; }                       // PaymentPlanId; manual'da null
+    public string Name { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;  // "Vize"/"UçakBileti"/"Manuel"
+    public decimal Amount { get; set; }
+    public string Currency { get; set; } = string.Empty;
 }
 
 public class CartMemberInfo

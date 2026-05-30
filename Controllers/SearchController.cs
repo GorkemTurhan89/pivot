@@ -232,6 +232,39 @@ public class SearchController : Controller
         return Json(supps);
     }
 
+    public IActionResult ExtraServices() => View();
+
+    // ExtraServices (Vize/UçakBileti) seçilen ana paketin ülkesine göre listelenir.
+    [HttpGet]
+    public async Task<IActionResult> GetExtraServices(int countryId)
+    {
+        var countryName = await _db.Countries
+            .Where(c => c.Id == countryId)
+            .Select(c => c.Name)
+            .FirstOrDefaultAsync();
+        if (countryName == null) return Json(Array.Empty<ExtraServiceListItemViewModel>());
+
+        var items = await (
+            from p in _db.PaymentPlans
+            join e in _db.ExtraServiceDetails on p.Id equals e.PaymentPlanId
+            where p.IsActive && p.IsAdditional
+                  && (p.Category == "Vize" || p.Category == "UçakBileti")
+                  && e.Country == countryName
+            orderby p.Category, p.Name
+            select new ExtraServiceListItemViewModel
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Category = p.Category ?? "",
+                VisaType = e.VisaType,
+                DefaultPrice = p.TotalListFee,
+                DefaultPriceText = e.DefaultPriceText,
+                Currency = e.Currency
+            }).ToListAsync();
+
+        return Json(items);
+    }
+
     public IActionResult Cart()
     {
         return View();
@@ -242,6 +275,7 @@ public class SearchController : Controller
     [HttpGet]
     public async Task<IActionResult> GetCart(int mainPlanId, int weeks, DateOnly startDate,
         [FromQuery] List<int> addOnIds, [FromQuery] string? addOnWeeksJson = null,
+        [FromQuery] string? extrasJson = null,
         [FromQuery] Guid? cartGuid = null)
     {
         // Weekly addon'ların hafta override'ları: {addonId: weeks} JSON. Yoksa ana paket hafta'sı kullanılır.
@@ -249,6 +283,13 @@ public class SearchController : Controller
             ? new Dictionary<int, int>()
             : System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, int>>(addOnWeeksJson)
                 ?? new Dictionary<int, int>();
+
+        // ExtraServices submit'inden gelen kalemler (UI'da tutarı düzenlenmiş + manuel eklenmiş).
+        var extras = string.IsNullOrEmpty(extrasJson)
+            ? new List<CartExtraInput>()
+            : System.Text.Json.JsonSerializer.Deserialize<List<CartExtraInput>>(extrasJson,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? new List<CartExtraInput>();
 
         var main = await _db.PaymentPlans
             .Where(p => p.Id == mainPlanId && p.PackageType == PackageType.Main)
@@ -348,8 +389,20 @@ public class SearchController : Controller
         }).ToList();
 
         var registration = main.RegistrationFee ?? 0m;
+
+        // Extras: ekran tarafından gönderilen kalemler (UI'da tutarı düzenlenmiş + manuel).
+        var extraLines = extras.Select(x => new CartAddOnLine
+        {
+            Name = x.Name,
+            Category = x.Category,
+            Amount = x.Amount,
+            Weeks = 0,
+            IsMandatory = false
+        }).ToList();
+
         var total = courseFinal + registration
-                    + addOnLines.Sum(l => l.Amount + (l.RegistrationFee ?? 0m));
+                    + addOnLines.Sum(l => l.Amount + (l.RegistrationFee ?? 0m))
+                    + extraLines.Sum(l => l.Amount);
 
         // Cart üst kart bilgisi: cartGuid verildiyse müşteri özet bilgisi yüklenir.
         CartMemberInfo? memberInfo = null;
@@ -449,6 +502,29 @@ public class SearchController : Controller
                     });
                 }
 
+                // Extras (ExtraServices + manuel kalemler) snapshot'a yazılır.
+                // PaymentPlanId manuel için NULL; ExtraService için PaymentPlan id'si.
+                foreach (var x in extras)
+                {
+                    _db.ChoosenPlanDetails.Add(new ChoosenPlanDetail
+                    {
+                        CartDetailId = cart.Id,
+                        PaymentPlanId = x.Id,    // manuel -> null
+                        Name = x.Name,
+                        Category = x.Category,
+                        MinWeek = 1,
+                        MaxWeek = 1,
+                        PriceType = PriceType.FixedTotal,
+                        TotalListFee = x.Amount,
+                        SelectedWeeks = 0,
+                        LineAmount = x.Amount,
+                        Currency = string.IsNullOrEmpty(x.Currency) ? main.Currency : x.Currency,
+                        IsDiscounted = false,
+                        IsMandatory = false,
+                        IsMain = false
+                    });
+                }
+
                 await _db.SaveChangesAsync();
             }
         }
@@ -468,6 +544,7 @@ public class SearchController : Controller
             },
             RegistrationFee = registration > 0 ? registration : null,
             AddOns = addOnLines,
+            Extras = extraLines,
             Total = total,
             Currency = main.Currency
         };

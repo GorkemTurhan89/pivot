@@ -10,7 +10,8 @@ public class ChoosenPlanDetail
     public int CartDetailId { get; set; }
     public CartDetail CartDetail { get; set; } = null!;
 
-    public int PaymentPlanId { get; set; }   // referans; silinmiş olabilir
+    // Referans; silinmiş olabilir. Manuel ExtraService kalemlerinde null.
+    public int? PaymentPlanId { get; set; }
 
     public string Name { get; set; } = string.Empty;
     public string? Category { get; set; }

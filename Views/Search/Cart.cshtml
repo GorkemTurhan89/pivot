@@ -11,7 +11,7 @@
 </div>
 
 <div class="mt-4">
-    <a href="/Search/AddOns" class="btn btn-outline-secondary">← Ek hizmetlere dön</a>
+    <a href="/Search/ExtraServices" class="btn btn-outline-secondary">← Ek hizmetlere (vize/uçak) dön</a>
 </div>
 
 @section Scripts {
@@ -36,6 +36,7 @@
                 params.set('startDate', sel.startDate ?? new Date().toISOString().slice(0, 10));
                 addOnIds.forEach(id => params.append('addOnIds', id));
                 params.set('addOnWeeksJson', localStorage.getItem('pivot.addOnWeeks') ?? '{}');
+                params.set('extrasJson', localStorage.getItem('pivot.extras') ?? '[]');
                 // CRM: cartGuid varsa snapshot persist için backend'e geçir (ileri/geri arası
                 // aynı sepet kaydını güncelleriz).
                 const lead = JSON.parse(localStorage.getItem('pivot.lead') ?? 'null');
@@ -105,6 +106,16 @@
                             <td class="text-end">${money(a.registrationFee, cur)}</td>
                         </tr>`);
                     }
+                });
+
+                // Extras (Vize / Uçak / Manuel) — currency kalem bazlı (her satır kendi para birimi)
+                (c.extras ?? []).forEach(e => {
+                    rows.push(`
+                        <tr>
+                            <td>${e.name}</td>
+                            <td class="text-muted">${e.category ?? ''}</td>
+                            <td class="text-end">${money(e.amount, cur)}</td>
+                        </tr>`);
                 });
 
                 container.innerHTML = `
