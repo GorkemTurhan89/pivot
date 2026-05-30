@@ -30,7 +30,7 @@
             async function load() {
                 const params = new URLSearchParams();
                 params.set('mainPlanId', sel.mainPlanId);
-                params.set('weeks', sel.weeks ?? 1);
+                params.set('weeks', sel.requestedLengthOfMain ?? 1);
                 params.set('startDate', sel.startDate ?? new Date().toISOString().slice(0, 10));
                 addOnIds.forEach(id => params.append('addOnIds', id));
 

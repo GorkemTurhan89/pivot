@@ -215,7 +215,8 @@
                 const selection = {
                     mainPlanId: parseInt(btn.dataset.planId, 10),
                     planName: btn.dataset.planName,
-                    weeks: weeks,
+                    // Ana paketin tutar hesabında kullanılacak hafta: lengthFilter doluysa o, değilse bandın MinWeek'i.
+                    requestedLengthOfMain: weeks,
                     startDate: startDate.value,
                     countryId: parseInt(countrySel.value, 10),
                     cityId: parseInt(citySel.value, 10),
