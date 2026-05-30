@@ -240,8 +240,15 @@ public class SearchController : Controller
     // BÜYÜK GEÇİŞ (2026-05-30): kurs tutarı bant fiyatından hesaplanıyor.
     // weeks parametresi zorunlu — kullanıcı seçim ekranında girdiği hafta sayısı.
     [HttpGet]
-    public async Task<IActionResult> GetCart(int mainPlanId, int weeks, DateOnly startDate, [FromQuery] List<int> addOnIds)
+    public async Task<IActionResult> GetCart(int mainPlanId, int weeks, DateOnly startDate,
+        [FromQuery] List<int> addOnIds, [FromQuery] string? addOnWeeksJson = null)
     {
+        // Weekly addon'ların hafta override'ları: {addonId: weeks} JSON. Yoksa ana paket hafta'sı kullanılır.
+        var addOnWeeksMap = string.IsNullOrEmpty(addOnWeeksJson)
+            ? new Dictionary<int, int>()
+            : System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, int>>(addOnWeeksJson)
+                ?? new Dictionary<int, int>();
+
         var main = await _db.PaymentPlans
             .Where(p => p.Id == mainPlanId && p.PackageType == PackageType.Main)
             .Select(p => new
@@ -297,6 +304,7 @@ public class SearchController : Controller
             .ThenBy(p => p.Name)
             .Select(a => new
             {
+                a.Id,
                 a.Name,
                 a.Category,
                 a.PriceType,
@@ -312,15 +320,23 @@ public class SearchController : Controller
         var addOnLines = rawAddOns.Select(a =>
         {
             decimal amount;
+            int usedWeeks = 0;
             if (a.PriceType == PriceType.Weekly)
-                amount = (a.WeeklyPromoFee ?? a.WeeklyListFee ?? 0m) * weeks;
+            {
+                // Per-addon override varsa kullan, yoksa ana paketin hafta'sına düş.
+                usedWeeks = addOnWeeksMap.TryGetValue(a.Id, out var w) && w > 0 ? w : weeks;
+                amount = (a.WeeklyPromoFee ?? a.WeeklyListFee ?? 0m) * usedWeeks;
+            }
             else
+            {
                 amount = a.TotalPromoFee ?? a.TotalListFee ?? 0m;
+            }
             return new CartAddOnLine
             {
                 Name = a.Name,
                 Category = a.Category,
                 Amount = amount,
+                Weeks = usedWeeks,
                 RegistrationFee = a.RegistrationFee,
                 IsMandatory = a.IsOrHasMandatory
             };

@@ -84,4 +84,6 @@ public class CartAddOnLine
     // Tutulduğu yer: PaymentPlan.RegistrationFee (yan tabloda değil). UI'da addon altında satır olarak gösterilir.
     public decimal? RegistrationFee { get; set; }
     public bool IsMandatory { get; set; }
+    // Weekly addon'lar için kullanıcının seçtiği hafta (per-addon override). FixedTotal'larda 0.
+    public int Weeks { get; set; }
 }

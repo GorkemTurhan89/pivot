@@ -33,6 +33,7 @@
                 params.set('weeks', sel.requestedLengthOfMain ?? 1);
                 params.set('startDate', sel.startDate ?? new Date().toISOString().slice(0, 10));
                 addOnIds.forEach(id => params.append('addOnIds', id));
+                params.set('addOnWeeksJson', localStorage.getItem('pivot.addOnWeeks') ?? '{}');
 
                 const res = await fetch(`/Search/GetCart?${params.toString()}`);
                 if (!res.ok) {
@@ -66,7 +67,7 @@
                     rows.push(`
                         <tr>
                             <td>${a.name} ${a.isMandatory ? '<span class="badge bg-danger ms-1">Zorunlu</span>' : ''}</td>
-                            <td class="text-muted">${a.category ?? ''}</td>
+                            <td class="text-muted">${a.category ?? ''}${a.weeks > 0 ? ' · ' + a.weeks + ' hafta' : ''}</td>
                             <td class="text-end">${money(a.amount, cur)}</td>
                         </tr>`);
                     if (a.registrationFee != null && a.registrationFee > 0) {

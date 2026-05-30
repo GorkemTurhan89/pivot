@@ -56,12 +56,25 @@
                     <span class="text-muted">— ${sel.schoolName ?? ''}, ${sel.cityName ?? ''} / ${sel.countryName ?? ''}</span>
                 </div>`;
 
+            const defaultWeeks = parseInt(sel.requestedLengthOfMain, 10) || 1;
+
             const continueBtn = document.getElementById('continueBtn');
             continueBtn.disabled = false;
             continueBtn.addEventListener('click', () => {
-                const ids = [...document.querySelectorAll('.addon-check:checked, .supp-check:checked')]
-                    .map(c => parseInt(c.value, 10));
+                const checks = [...document.querySelectorAll('.addon-check:checked, .supp-check:checked')];
+                const ids = checks.map(c => parseInt(c.value, 10));
+                // Weekly addon'lar için per-addon hafta map'i: {addonId: weeks}
+                const weeksMap = {};
+                checks.forEach(c => {
+                    const row = c.closest('tr');
+                    const wInput = row.querySelector('.addon-weeks');
+                    if (wInput) {
+                        const w = parseInt(wInput.value, 10);
+                        if (!isNaN(w) && w > 0) weeksMap[c.value] = w;
+                    }
+                });
                 localStorage.setItem('pivot.selectedAddOns', JSON.stringify(ids));
+                localStorage.setItem('pivot.addOnWeeks', JSON.stringify(weeksMap));
                 window.location.href = '/Search/Cart';
             });
 
@@ -94,7 +107,14 @@
                             ${a.isMandatory ? '<span class="badge bg-danger ms-1">Zorunlu</span>' : ''}
                         </td>
                         <td>${a.category ?? ''}</td>
-                        <td class="text-end">${fmt(a.price)} ${a.currency}${a.priceType === 'Weekly' ? '/hafta' : ''}</td>
+                        <td class="text-end">
+                            ${fmt(a.price)} ${a.currency}${a.priceType === 'Weekly' ? '/hafta' : ''}
+                            ${a.priceType === 'Weekly'
+                                ? `<input type="number" class="form-control form-control-sm d-inline-block ms-2 addon-weeks"
+                                          data-addon-id="${a.id}" value="${defaultWeeks}" min="1"
+                                          title="Bu hizmet için hafta" style="width:5rem">`
+                                : ''}
+                        </td>
                     </tr>`;
                 }).join('');
 
@@ -156,7 +176,12 @@
                             </td>
                             <td>↳ ${s.name} ${dateRange} ${lockIcon}</td>
                             <td>Supplement / ${s.appliesTo}</td>
-                            <td class="text-end">${fmt(s.weeklyFee)} ${s.currency}/hafta</td>
+                            <td class="text-end">
+                                ${fmt(s.weeklyFee)} ${s.currency}/hafta
+                                <input type="number" class="form-control form-control-sm d-inline-block ms-2 addon-weeks"
+                                       data-addon-id="${s.id}" value="${defaultWeeks}" min="1"
+                                       title="Bu supplement için hafta" style="width:5rem">
+                            </td>
                         </tr>`;
                     after.insertAdjacentHTML('afterend', html);
                     after = after.nextElementSibling;
