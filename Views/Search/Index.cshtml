@@ -159,6 +159,8 @@
                 startDate.value = todayStr;
                 startDate.disabled = !programSel.value;
                 clearAll();
+                // Tarih zaten bugünle dolu; programa girilir girilmez sorguyu hemen tetikle (debounce yok).
+                if (programSel.value) runPaymentPlanSearch();
             });
 
             const runPaymentPlanSearch = async () => {
