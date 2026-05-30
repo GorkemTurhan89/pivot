@@ -59,6 +59,26 @@ public class LeadController : Controller
         input.CreatedAt = DateTime.UtcNow;
         _db.MemberDetails.Add(input);
         await _db.SaveChangesAsync();
-        return Ok(new { memberId = input.Id });
+
+        // CRM lead kaydı: üye yaratıldığı an CartDetail (LeadCreated) düşer.
+        // Snapshot alanları ileride üyenin profili değişse de bu cart için sabit kalır.
+        var cart = new CartDetail
+        {
+            MemberId = input.Id,
+            PersonalId = input.PersonalId,
+            RegisterDate = DateOnly.FromDateTime(input.CreatedAt),
+            Nationality = input.Nationality,
+            Email = input.Email,
+            PhoneNumber = input.PhoneNumber,
+            Status = CartStatus.LeadCreated,
+            CreateDate = DateTime.UtcNow,
+            UpdateDate = DateTime.UtcNow,
+            CartGuid = Guid.NewGuid(),
+            TotalPaymentPrice = 0m
+        };
+        _db.CartDetails.Add(cart);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { memberId = input.Id, cartDetailId = cart.Id, cartGuid = cart.CartGuid });
     }
 }

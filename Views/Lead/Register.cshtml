@@ -193,6 +193,9 @@
                     alert(data.error ?? 'Kayıt oluşturulamadı.');
                     return;
                 }
+                const data = await res.json();
+                // CRM: cartDetailId'yi sonraki adımlara taşı (cart'ta snapshot persist için).
+                localStorage.setItem('pivot.lead', JSON.stringify(data));
                 window.location.href = '/Search/Index';
             });
         })();

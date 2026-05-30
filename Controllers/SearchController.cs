@@ -241,7 +241,8 @@ public class SearchController : Controller
     // weeks parametresi zorunlu — kullanıcı seçim ekranında girdiği hafta sayısı.
     [HttpGet]
     public async Task<IActionResult> GetCart(int mainPlanId, int weeks, DateOnly startDate,
-        [FromQuery] List<int> addOnIds, [FromQuery] string? addOnWeeksJson = null)
+        [FromQuery] List<int> addOnIds, [FromQuery] string? addOnWeeksJson = null,
+        [FromQuery] int? cartDetailId = null)
     {
         // Weekly addon'ların hafta override'ları: {addonId: weeks} JSON. Yoksa ana paket hafta'sı kullanılır.
         var addOnWeeksMap = string.IsNullOrEmpty(addOnWeeksJson)
@@ -254,6 +255,8 @@ public class SearchController : Controller
             .Select(p => new
             {
                 p.Name,
+                p.MinWeek,
+                p.MaxWeek,
                 p.PriceType,
                 p.WeeklyListFee,
                 p.WeeklyPromoFee,
@@ -307,6 +310,8 @@ public class SearchController : Controller
                 a.Id,
                 a.Name,
                 a.Category,
+                a.MinWeek,
+                a.MaxWeek,
                 a.PriceType,
                 a.WeeklyListFee,
                 a.WeeklyPromoFee,
@@ -345,6 +350,91 @@ public class SearchController : Controller
         var registration = main.RegistrationFee ?? 0m;
         var total = courseFinal + registration
                     + addOnLines.Sum(l => l.Amount + (l.RegistrationFee ?? 0m));
+
+        // CRM snapshot: cartDetailId varsa CartDetail OfferCreated'a evrilir ve
+        // seçili planlar ChoosenPlanDetails'a yazılır (mevcut snapshot silinir, yenisi yazılır).
+        if (cartDetailId.HasValue)
+        {
+            var cart = await _db.CartDetails.Include(c => c.ChoosenPlans)
+                .FirstOrDefaultAsync(c => c.Id == cartDetailId.Value);
+            if (cart != null)
+            {
+                cart.Status = CartStatus.OfferCreated;
+                cart.UpdateDate = DateTime.UtcNow;
+                cart.TotalPaymentPrice = total;
+                if (cart.ChoosenPlans.Count > 0) _db.ChoosenPlanDetails.RemoveRange(cart.ChoosenPlans);
+
+                bool mainDiscounted = (main.PriceType == PriceType.Weekly
+                        ? (inPromoWindow && main.WeeklyPromoFee.HasValue)
+                        : (inPromoWindow && main.TotalPromoFee.HasValue));
+
+                _db.ChoosenPlanDetails.Add(new ChoosenPlanDetail
+                {
+                    CartDetailId = cart.Id,
+                    PaymentPlanId = mainPlanId,
+                    Name = main.Name,
+                    Category = null,
+                    MinWeek = main.MinWeek,
+                    MaxWeek = main.MaxWeek,
+                    PriceType = main.PriceType,
+                    WeeklyListFee = main.WeeklyListFee,
+                    WeeklyPromoFee = main.WeeklyPromoFee,
+                    TotalListFee = main.TotalListFee,
+                    TotalPromoFee = main.TotalPromoFee,
+                    SelectedWeeks = main.PriceType == PriceType.Weekly ? weeks : 0,
+                    LineAmount = courseFinal,
+                    RegistrationFee = main.RegistrationFee,
+                    Currency = main.Currency,
+                    IsDiscounted = mainDiscounted,
+                    IsMandatory = false,
+                    IsMain = true
+                });
+
+                foreach (var a in rawAddOns)
+                {
+                    int addonWeeks;
+                    decimal addonAmount;
+                    bool addonDiscounted;
+                    if (a.PriceType == PriceType.Weekly)
+                    {
+                        addonWeeks = addOnWeeksMap.TryGetValue(a.Id, out var w) && w > 0 ? w : weeks;
+                        var unit = a.WeeklyPromoFee ?? a.WeeklyListFee ?? 0m;
+                        addonAmount = unit * addonWeeks;
+                        addonDiscounted = a.WeeklyPromoFee.HasValue;
+                    }
+                    else
+                    {
+                        addonWeeks = 0;
+                        addonAmount = a.TotalPromoFee ?? a.TotalListFee ?? 0m;
+                        addonDiscounted = a.TotalPromoFee.HasValue;
+                    }
+
+                    _db.ChoosenPlanDetails.Add(new ChoosenPlanDetail
+                    {
+                        CartDetailId = cart.Id,
+                        PaymentPlanId = a.Id,
+                        Name = a.Name,
+                        Category = a.Category,
+                        MinWeek = a.MinWeek,
+                        MaxWeek = a.MaxWeek,
+                        PriceType = a.PriceType,
+                        WeeklyListFee = a.WeeklyListFee,
+                        WeeklyPromoFee = a.WeeklyPromoFee,
+                        TotalListFee = a.TotalListFee,
+                        TotalPromoFee = a.TotalPromoFee,
+                        SelectedWeeks = addonWeeks,
+                        LineAmount = addonAmount,
+                        RegistrationFee = a.RegistrationFee,
+                        Currency = main.Currency,
+                        IsDiscounted = addonDiscounted,
+                        IsMandatory = a.IsOrHasMandatory,
+                        IsMain = false
+                    });
+                }
+
+                await _db.SaveChangesAsync();
+            }
+        }
 
         var vm = new CartViewModel
         {

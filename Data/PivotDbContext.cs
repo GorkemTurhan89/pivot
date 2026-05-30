@@ -17,6 +17,8 @@ public class PivotDbContext : DbContext
     public DbSet<AccommodationDetail> AccommodationDetails => Set<AccommodationDetail>();
     public DbSet<SupplementDetail> SupplementDetails => Set<SupplementDetail>();
     public DbSet<MemberDetail> MemberDetails => Set<MemberDetail>();
+    public DbSet<CartDetail> CartDetails => Set<CartDetail>();
+    public DbSet<ChoosenPlanDetail> ChoosenPlanDetails => Set<ChoosenPlanDetail>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -34,6 +34,9 @@
                 params.set('startDate', sel.startDate ?? new Date().toISOString().slice(0, 10));
                 addOnIds.forEach(id => params.append('addOnIds', id));
                 params.set('addOnWeeksJson', localStorage.getItem('pivot.addOnWeeks') ?? '{}');
+                // CRM: cartDetailId varsa snapshot persist için backend'e geçir.
+                const lead = JSON.parse(localStorage.getItem('pivot.lead') ?? 'null');
+                if (lead && lead.cartDetailId) params.set('cartDetailId', lead.cartDetailId);
 
                 const res = await fetch(`/Search/GetCart?${params.toString()}`);
                 if (!res.ok) {
