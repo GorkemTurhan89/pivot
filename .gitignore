@@ -9,3 +9,6 @@ appsettings.Development.json
 
 ## Claude Code yerel ayarları
 .claude/settings.local.json
+
+## DB yedekleri ve geçici script'ler
+backups/

@@ -16,11 +16,18 @@ public class PaymentPlanConfiguration : IEntityTypeConfiguration<PaymentPlan>
             .IsRequired()
             .HasMaxLength(200);
 
-        builder.Property(p => p.LengthWeeks)
-            .IsRequired();
+        // BÜYÜK GEÇİŞ (2026-05-30): bant fiyat modeli (Excel uyumu).
+        builder.Property(p => p.MinWeek).IsRequired();
+        builder.Property(p => p.MaxWeek).IsRequired();
 
-        builder.Property(p => p.ValidFrom).IsRequired();
-        builder.Property(p => p.ValidTo).IsRequired();
+        builder.Property(p => p.PriceType)
+            .IsRequired()
+            .HasConversion<int>();
+
+        builder.Property(p => p.WeeklyListFee).HasPrecision(18, 2);
+        builder.Property(p => p.WeeklyPromoFee).HasPrecision(18, 2);
+        builder.Property(p => p.TotalListFee).HasPrecision(18, 2);
+        builder.Property(p => p.TotalPromoFee).HasPrecision(18, 2);
 
         builder.Property(p => p.PackageType)
             .IsRequired()
@@ -53,6 +60,6 @@ public class PaymentPlanConfiguration : IEntityTypeConfiguration<PaymentPlan>
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired(false);
 
-        builder.HasIndex(p => new { p.SchoolId, p.ProgramId, p.LengthWeeks, p.ValidFrom, p.ValidTo, p.PackageType });
+        builder.HasIndex(p => new { p.SchoolId, p.ProgramId, p.MinWeek, p.MaxWeek, p.PackageType });
     }
 }

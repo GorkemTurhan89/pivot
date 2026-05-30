@@ -16,6 +16,10 @@ public class CountryConfiguration : IEntityTypeConfiguration<Country>
             .IsRequired()
             .HasMaxLength(100);
 
+        builder.Property(c => c.Currency)
+            .IsRequired()
+            .HasMaxLength(3);
+
         builder.HasIndex(c => c.Name).IsUnique();
     }
 }

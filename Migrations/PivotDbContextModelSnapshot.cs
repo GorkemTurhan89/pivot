@@ -54,6 +54,11 @@ namespace Pivot.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("varchar(3)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -142,12 +147,15 @@ namespace Pivot.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(false);
 
-                    b.Property<int>("LengthWeeks")
+                    b.Property<int>("MaxWeek")
                         .HasColumnType("int");
 
                     b.Property<decimal?>("MembershipFee")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("MinWeek")
+                        .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -157,8 +165,17 @@ namespace Pivot.Migrations
                     b.Property<int>("PackageType")
                         .HasColumnType("int");
 
+                    b.Property<int>("PriceType")
+                        .HasColumnType("int");
+
                     b.Property<int?>("ProgramId")
                         .HasColumnType("int");
+
+                    b.Property<DateOnly?>("PromoValidFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("PromoValidUntil")
+                        .HasColumnType("date");
 
                     b.Property<decimal?>("PromotedFee")
                         .HasPrecision(18, 2)
@@ -171,17 +188,27 @@ namespace Pivot.Migrations
                     b.Property<int>("SchoolId")
                         .HasColumnType("int");
 
-                    b.Property<DateOnly>("ValidFrom")
-                        .HasColumnType("date");
+                    b.Property<decimal?>("TotalListFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
-                    b.Property<DateOnly>("ValidTo")
-                        .HasColumnType("date");
+                    b.Property<decimal?>("TotalPromoFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("WeeklyListFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("WeeklyPromoFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ProgramId");
 
-                    b.HasIndex("SchoolId", "ProgramId", "LengthWeeks", "ValidFrom", "ValidTo", "PackageType");
+                    b.HasIndex("SchoolId", "ProgramId", "MinWeek", "MaxWeek", "PackageType");
 
                     b.ToTable("PaymentPlans", (string)null);
                 });

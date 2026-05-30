@@ -164,14 +164,16 @@
                 results.innerHTML = '<p class="text-muted">Aranıyor...</p>';
                 allPlans = await fetchJson(`/Search/GetPaymentPlans?programId=${programSel.value}&startDate=${startDate.value}`);
 
-                const uniqueLengths = [...new Set(allPlans.map(p => p.lengthWeeks))].sort((a, b) => a - b);
-                lengthOptions.innerHTML = uniqueLengths.map(w => `<option value="${w}">${w} hafta</option>`).join('');
-                lengthFilter.disabled = uniqueLengths.length === 0;
+                // Bant modelinde datalist statik: 4/8/12/16/24 yaygın hafta seçenekleri.
+                lengthOptions.innerHTML = [4, 8, 12, 16, 24].map(w => `<option value="${w}">${w} hafta</option>`).join('');
+                lengthFilter.disabled = allPlans.length === 0;
 
                 renderResults(allPlans);
             };
 
             startDate.addEventListener('change', debounce(runPaymentPlanSearch, 600));
+            // BÜYÜK GEÇİŞ (2026-05-30): bant modeli. lengthFilter "hafta" girdisi olarak çalışır;
+            // bandı (MinWeek<=N<=MaxWeek) eşleyen plan(lar) gösterilir.
 
             function applyLengthFilter() {
                 const v = lengthFilter.value.trim();
@@ -184,7 +186,7 @@
                     renderResults(allPlans);
                     return;
                 }
-                renderResults(allPlans.filter(p => p.lengthWeeks === n));
+                renderResults(allPlans.filter(p => p.minWeek <= n && n <= p.maxWeek));
             }
 
             lengthFilter.addEventListener('change', applyLengthFilter);
@@ -199,9 +201,15 @@
                 const btn = e.target.closest('.select-plan');
                 if (!btn) return;
 
+                // Bant modelinde sepet hesabı weeks gerektirir: lengthFilter dolu ise oradan, değilse bandın MinWeek'i.
+                const minWeek = parseInt(btn.dataset.minWeek, 10);
+                const filterVal = parseInt(lengthFilter.value, 10);
+                const weeks = !isNaN(filterVal) && filterVal > 0 ? filterVal : minWeek;
+
                 const selection = {
                     mainPlanId: parseInt(btn.dataset.planId, 10),
                     planName: btn.dataset.planName,
+                    weeks: weeks,
                     countryId: parseInt(countrySel.value, 10),
                     cityId: parseInt(citySel.value, 10),
                     schoolId: parseInt(schoolSel.value, 10),
@@ -218,25 +226,32 @@
                     results.innerHTML = '<div class="alert alert-warning">Seçtiğiniz tarihte sezona sığan paket bulunamadı.</div>';
                     return;
                 }
-                const rows = plans.map(p => `
+                const fmt = v => Number(v).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const rows = plans.map(p => {
+                    const unit = p.priceType === 'Weekly'
+                        ? `${fmt(p.listUnit)} ${p.currency}/hafta`
+                        : `${fmt(p.listUnit)} ${p.currency} (sabit toplam)`;
+                    const promo = p.promoUnit != null
+                        ? `<span class="badge bg-success ms-1">Promosyon: ${fmt(p.promoUnit)} ${p.currency}${p.priceType === 'Weekly' ? '/hafta' : ''}</span>`
+                        : '';
+                    return `
                     <tr>
                         <td>${p.name}</td>
-                        <td class="text-end">${p.lengthWeeks} hafta</td>
-                        <td>${p.endDate}</td>
-                        <td>${p.validFrom} – ${p.validTo}</td>
-                        <td class="text-end">${p.totalPrice.toLocaleString('tr-TR')} ${p.currency}</td>
-                        <td><button class="btn btn-sm btn-primary select-plan" data-plan-id="${p.id}" data-plan-name="${p.name}">Seç</button></td>
-                    </tr>
-                `).join('');
+                        <td class="text-end">${p.minWeek}–${p.maxWeek} hafta</td>
+                        <td>${unit} ${promo}</td>
+                        <td><button class="btn btn-sm btn-primary select-plan"
+                                    data-plan-id="${p.id}"
+                                    data-plan-name="${p.name}"
+                                    data-min-week="${p.minWeek}">Seç</button></td>
+                    </tr>`;
+                }).join('');
                 results.innerHTML = `
                     <table class="table table-striped table-hover align-middle">
                         <thead>
                             <tr>
                                 <th>Paket</th>
-                                <th class="text-end">Uzunluk</th>
-                                <th>Bitiş Tarihi</th>
-                                <th>Geçerlilik Aralığı</th>
-                                <th class="text-end">Toplam Fiyat</th>
+                                <th class="text-end">Hafta Bandı</th>
+                                <th>Birim Fiyat</th>
                                 <th></th>
                             </tr>
                         </thead>

@@ -60,29 +60,79 @@ public class SearchController : Controller
         return Json(programs);
     }
 
+    // BÜYÜK GEÇİŞ (2026-05-30): bant fiyat modeline geçildi.
+    // Course'un kendi sezon geçerliliği (ValidFrom/ValidTo) ARTIK YOK — Excel'de yok.
+    // weeks verilirse o bantta (MinWeek<=weeks<=MaxWeek) eşleşen plan dönülür ve toplamlar hesaplanır.
     [HttpGet]
-    public async Task<IActionResult> GetPaymentPlans(int programId, DateOnly startDate)
+    public async Task<IActionResult> GetPaymentPlans(int programId, DateOnly startDate, int? weeks)
     {
-        var plans = await _db.PaymentPlans
+        var q = _db.PaymentPlans
             .Where(p => p.ProgramId == programId
                 && p.PackageType == PackageType.Main
-                && p.IsActive
-                && p.ValidFrom <= startDate
-                && startDate <= p.ValidTo
-                && startDate.AddDays(p.LengthWeeks * 7) <= p.ValidTo)
-            .OrderBy(p => p.LengthWeeks)
-            .Select(p => new PaymentPlanListItemViewModel
+                && p.IsActive);
+
+        if (weeks.HasValue && weeks.Value > 0)
+        {
+            var w = weeks.Value;
+            q = q.Where(p => p.MinWeek <= w && w <= p.MaxWeek);
+        }
+
+        var raw = await q
+            .OrderBy(p => p.MinWeek)
+            .Select(p => new
+            {
+                p.Id,
+                p.Name,
+                p.MinWeek,
+                p.MaxWeek,
+                p.PriceType,
+                p.WeeklyListFee,
+                p.WeeklyPromoFee,
+                p.TotalListFee,
+                p.TotalPromoFee,
+                Currency = p.School.City.Country.Currency
+            })
+            .ToListAsync();
+
+        var plans = raw.Select(p =>
+        {
+            decimal listUnit;
+            decimal? promoUnit;
+            decimal? listTotal = null;
+            decimal? promoTotal = null;
+            if (p.PriceType == PriceType.Weekly)
+            {
+                listUnit = p.WeeklyListFee ?? 0m;
+                promoUnit = p.WeeklyPromoFee;
+                if (weeks.HasValue && weeks.Value > 0)
+                {
+                    listTotal = listUnit * weeks.Value;
+                    if (promoUnit.HasValue) promoTotal = promoUnit.Value * weeks.Value;
+                }
+            }
+            else
+            {
+                listUnit = p.TotalListFee ?? 0m;
+                promoUnit = p.TotalPromoFee;
+                listTotal = listUnit;
+                promoTotal = promoUnit;
+            }
+            return new PaymentPlanListItemViewModel
             {
                 Id = p.Id,
                 Name = p.Name,
-                LengthWeeks = p.LengthWeeks,
-                ValidFrom = p.ValidFrom,
-                ValidTo = p.ValidTo,
-                TotalPrice = p.Items.Sum(i => i.ItemPrice * i.Quantity),
-                Currency = p.Items.Select(i => i.Currency).FirstOrDefault() ?? "GBP",
-                EndDate = startDate.AddDays(p.LengthWeeks * 7)
-            })
-            .ToListAsync();
+                MinWeek = p.MinWeek,
+                MaxWeek = p.MaxWeek,
+                PriceType = p.PriceType.ToString(),
+                ListUnit = listUnit,
+                PromoUnit = promoUnit,
+                SelectedWeeks = weeks,
+                ListTotal = listTotal,
+                PromoTotal = promoTotal,
+                Currency = p.Currency,
+                EndDate = weeks.HasValue && weeks.Value > 0 ? startDate.AddDays(weeks.Value * 7) : (DateOnly?)null
+            };
+        }).ToList();
 
         return Json(plans);
     }
@@ -126,23 +176,49 @@ public class SearchController : Controller
         return View();
     }
 
+    // BÜYÜK GEÇİŞ (2026-05-30): kurs tutarı bant fiyatından hesaplanıyor.
+    // weeks parametresi zorunlu — kullanıcı seçim ekranında girdiği hafta sayısı.
     [HttpGet]
-    public async Task<IActionResult> GetCart(int mainPlanId, [FromQuery] List<int> addOnIds)
+    public async Task<IActionResult> GetCart(int mainPlanId, int weeks, [FromQuery] List<int> addOnIds)
     {
         var main = await _db.PaymentPlans
             .Where(p => p.Id == mainPlanId && p.PackageType == PackageType.Main)
             .Select(p => new
             {
                 p.Name,
-                p.LengthWeeks,
+                p.PriceType,
+                p.WeeklyListFee,
+                p.WeeklyPromoFee,
+                p.TotalListFee,
+                p.TotalPromoFee,
                 p.RegistrationFee,
-                CourseSum = p.Items.Sum(i => i.ItemPrice * i.Quantity),
-                Currency = p.Items.Select(i => i.Currency).FirstOrDefault()
+                Currency = p.School.City.Country.Currency
             })
             .FirstOrDefaultAsync();
 
         if (main == null)
             return NotFound();
+
+        decimal courseList;
+        decimal courseFinal;
+        decimal weeklyRate;
+        if (main.PriceType == PriceType.Weekly)
+        {
+            var listFee = main.WeeklyListFee ?? 0m;
+            var promoFee = main.WeeklyPromoFee;
+            courseList = listFee * weeks;
+            courseFinal = (promoFee ?? listFee) * weeks;
+            weeklyRate = promoFee ?? listFee;
+        }
+        else
+        {
+            var listTotal = main.TotalListFee ?? 0m;
+            var promoTotal = main.TotalPromoFee;
+            courseList = listTotal;
+            courseFinal = promoTotal ?? listTotal;
+            weeklyRate = weeks > 0 ? courseFinal / weeks : courseFinal;
+        }
+        var discount = courseList - courseFinal;
 
         var addOnLines = await _db.PaymentPlans
             .Where(p => addOnIds.Contains(p.Id) && p.IsAdditional)
@@ -159,21 +235,23 @@ public class SearchController : Controller
             .ToListAsync();
 
         var registration = main.RegistrationFee ?? 0m;
-        var total = main.CourseSum + registration + addOnLines.Sum(l => l.Amount);
+        var total = courseFinal + registration + addOnLines.Sum(l => l.Amount);
 
         var vm = new CartViewModel
         {
             Main = new CartMainLine
             {
                 Name = main.Name,
-                Weeks = main.LengthWeeks,
-                WeeklyRate = main.LengthWeeks > 0 ? main.CourseSum / main.LengthWeeks : main.CourseSum,
-                LineTotal = main.CourseSum
+                Weeks = weeks,
+                WeeklyRate = weeklyRate,
+                LineTotal = courseFinal,
+                ListTotal = discount > 0 ? (decimal?)courseList : null,
+                Discount = discount > 0 ? (decimal?)discount : null
             },
             RegistrationFee = registration > 0 ? registration : null,
             AddOns = addOnLines,
             Total = total,
-            Currency = main.Currency ?? "GBP"
+            Currency = main.Currency
         };
 
         return Json(vm);

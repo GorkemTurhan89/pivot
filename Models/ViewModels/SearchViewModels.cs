@@ -1,3 +1,5 @@
+using Pivot.Models.Entities;
+
 namespace Pivot.Models.ViewModels;
 
 public class SearchIndexViewModel
@@ -11,16 +13,22 @@ public class LookupItem
     public string Name { get; set; } = string.Empty;
 }
 
+// BÜYÜK GEÇİŞ (2026-05-30): bant fiyat modeli ile bu VM tamamen yeniden şekillendi.
+// LengthWeeks/ValidFrom/ValidTo/TotalPrice -> MinWeek/MaxWeek/PriceType + List/Promo birim ve toplam.
 public class PaymentPlanListItemViewModel
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public int LengthWeeks { get; set; }
-    public DateOnly ValidFrom { get; set; }
-    public DateOnly ValidTo { get; set; }
-    public decimal TotalPrice { get; set; }
-    public string Currency { get; set; } = "GBP";
-    public DateOnly EndDate { get; set; }
+    public int MinWeek { get; set; }
+    public int MaxWeek { get; set; }
+    public string PriceType { get; set; } = "Weekly"; // "Weekly" | "FixedTotal"
+    public decimal ListUnit { get; set; }            // Weekly: haftalık liste ücreti / FixedTotal: liste toplamı
+    public decimal? PromoUnit { get; set; }          // varsa promosyonlu birim
+    public int? SelectedWeeks { get; set; }
+    public decimal? ListTotal { get; set; }          // SelectedWeeks doluyken
+    public decimal? PromoTotal { get; set; }
+    public string Currency { get; set; } = string.Empty;
+    public DateOnly? EndDate { get; set; }
 }
 
 public class AddOnListItemViewModel
@@ -47,7 +55,9 @@ public class CartMainLine
     public string Name { get; set; } = string.Empty;
     public int Weeks { get; set; }
     public decimal WeeklyRate { get; set; }
-    public decimal LineTotal { get; set; }
+    public decimal LineTotal { get; set; }       // promo varsa promo, yoksa liste
+    public decimal? ListTotal { get; set; }      // promo varsa indirimsiz tutar gösterilir
+    public decimal? Discount { get; set; }       // ListTotal - LineTotal (pozitifse)
 }
 
 public class CartAddOnLine

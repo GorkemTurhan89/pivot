@@ -30,6 +30,7 @@
             async function load() {
                 const params = new URLSearchParams();
                 params.set('mainPlanId', sel.mainPlanId);
+                params.set('weeks', sel.weeks ?? 1);
                 addOnIds.forEach(id => params.append('addOnIds', id));
 
                 const res = await fetch(`/Search/GetCart?${params.toString()}`);

@@ -12,8 +12,8 @@ using Pivot.Data;
 namespace Pivot.Migrations
 {
     [DbContext(typeof(PivotDbContext))]
-    [Migration("20260528093211_AddIsOrHasMandatory")]
-    partial class AddIsOrHasMandatory
+    [Migration("20260530120146_Initial_BandPricingModel")]
+    partial class Initial_BandPricingModel
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -57,6 +57,11 @@ namespace Pivot.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("varchar(3)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -94,6 +99,30 @@ namespace Pivot.Migrations
                     b.ToTable("Programs", (string)null);
                 });
 
+            modelBuilder.Entity("Pivot.Models.Entities.MainAddOnLink", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AddOnPlanId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MainPlanId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AddOnPlanId");
+
+                    b.HasIndex("MainPlanId", "AddOnPlanId")
+                        .IsUnique();
+
+                    b.ToTable("MainAddOnLinks", (string)null);
+                });
+
             modelBuilder.Entity("Pivot.Models.Entities.PaymentPlan", b =>
                 {
                     b.Property<int>("Id")
@@ -121,12 +150,15 @@ namespace Pivot.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(false);
 
-                    b.Property<int>("LengthWeeks")
+                    b.Property<int>("MaxWeek")
                         .HasColumnType("int");
 
                     b.Property<decimal?>("MembershipFee")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("MinWeek")
+                        .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -136,8 +168,17 @@ namespace Pivot.Migrations
                     b.Property<int>("PackageType")
                         .HasColumnType("int");
 
+                    b.Property<int>("PriceType")
+                        .HasColumnType("int");
+
                     b.Property<int?>("ProgramId")
                         .HasColumnType("int");
+
+                    b.Property<DateOnly?>("PromoValidFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("PromoValidUntil")
+                        .HasColumnType("date");
 
                     b.Property<decimal?>("PromotedFee")
                         .HasPrecision(18, 2)
@@ -150,17 +191,27 @@ namespace Pivot.Migrations
                     b.Property<int>("SchoolId")
                         .HasColumnType("int");
 
-                    b.Property<DateOnly>("ValidFrom")
-                        .HasColumnType("date");
+                    b.Property<decimal?>("TotalListFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
-                    b.Property<DateOnly>("ValidTo")
-                        .HasColumnType("date");
+                    b.Property<decimal?>("TotalPromoFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("WeeklyListFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("WeeklyPromoFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ProgramId");
 
-                    b.HasIndex("SchoolId", "ProgramId", "LengthWeeks", "ValidFrom", "ValidTo", "PackageType");
+                    b.HasIndex("SchoolId", "ProgramId", "MinWeek", "MaxWeek", "PackageType");
 
                     b.ToTable("PaymentPlans", (string)null);
                 });
@@ -248,6 +299,25 @@ namespace Pivot.Migrations
                     b.Navigation("School");
                 });
 
+            modelBuilder.Entity("Pivot.Models.Entities.MainAddOnLink", b =>
+                {
+                    b.HasOne("Pivot.Models.Entities.PaymentPlan", "AddOnPlan")
+                        .WithMany("MainLinks")
+                        .HasForeignKey("AddOnPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Pivot.Models.Entities.PaymentPlan", "MainPlan")
+                        .WithMany("AddOnLinks")
+                        .HasForeignKey("MainPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AddOnPlan");
+
+                    b.Navigation("MainPlan");
+                });
+
             modelBuilder.Entity("Pivot.Models.Entities.PaymentPlan", b =>
                 {
                     b.HasOne("Pivot.Models.Entities.CourseProgram", "Program")
@@ -305,7 +375,11 @@ namespace Pivot.Migrations
 
             modelBuilder.Entity("Pivot.Models.Entities.PaymentPlan", b =>
                 {
+                    b.Navigation("AddOnLinks");
+
                     b.Navigation("Items");
+
+                    b.Navigation("MainLinks");
                 });
 
             modelBuilder.Entity("Pivot.Models.Entities.School", b =>

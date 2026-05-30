@@ -12,10 +12,25 @@ public class PaymentPlan
 
     public string Name { get; set; } = string.Empty;
 
-    public int LengthWeeks { get; set; }
+    // BÜYÜK GEÇİŞ (2026-05-30): tek-değer LengthWeeks ve ValidFrom/ValidTo kaldırıldı.
+    // Yerine Excel kaynaklı bant modeli: MinWeek..MaxWeek aralığı + Weekly veya FixedTotal fiyat.
+    public int MinWeek { get; set; }
+    public int MaxWeek { get; set; }
 
-    public DateOnly ValidFrom { get; set; }
-    public DateOnly ValidTo { get; set; }
+    public PriceType PriceType { get; set; } = PriceType.Weekly;
+
+    // Weekly tipinde dolu: haftalık liste/promo ücreti (tutar para birimi Country.Currency).
+    public decimal? WeeklyListFee { get; set; }
+    public decimal? WeeklyPromoFee { get; set; }
+
+    // FixedTotal tipinde dolu: sabit toplam liste/promo ücreti.
+    public decimal? TotalListFee { get; set; }
+    public decimal? TotalPromoFee { get; set; }
+
+    // Promosyonun geçerlilik aralığı (Excel: PromoValidFrom/Until). Course'un kendi sezon
+    // geçerliliği Excel'de yok, o yüzden ValidFrom/ValidTo kaldırıldı.
+    public DateOnly? PromoValidFrom { get; set; }
+    public DateOnly? PromoValidUntil { get; set; }
 
     public PackageType PackageType { get; set; } = PackageType.Main;
 

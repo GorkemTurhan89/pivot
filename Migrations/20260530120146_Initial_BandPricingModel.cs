@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Pivot.Migrations
 {
     /// <inheritdoc />
-    public partial class Initial : Migration
+    public partial class Initial_BandPricingModel : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -22,6 +22,8 @@ namespace Pivot.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     Name = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Currency = table.Column<string>(type: "varchar(3)", maxLength: 3, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
@@ -106,10 +108,23 @@ namespace Pivot.Migrations
                     ProgramId = table.Column<int>(type: "int", nullable: true),
                     Name = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    LengthWeeks = table.Column<int>(type: "int", nullable: false),
-                    ValidFrom = table.Column<DateOnly>(type: "date", nullable: false),
-                    ValidTo = table.Column<DateOnly>(type: "date", nullable: false),
+                    MinWeek = table.Column<int>(type: "int", nullable: false),
+                    MaxWeek = table.Column<int>(type: "int", nullable: false),
+                    PriceType = table.Column<int>(type: "int", nullable: false),
+                    WeeklyListFee = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
+                    WeeklyPromoFee = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
+                    TotalListFee = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
+                    TotalPromoFee = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
+                    PromoValidFrom = table.Column<DateOnly>(type: "date", nullable: true),
+                    PromoValidUntil = table.Column<DateOnly>(type: "date", nullable: true),
                     PackageType = table.Column<int>(type: "int", nullable: false),
+                    IsAdditional = table.Column<bool>(type: "tinyint(1)", nullable: false, defaultValue: false),
+                    Category = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    MembershipFee = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
+                    RegistrationFee = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
+                    PromotedFee = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
+                    IsOrHasMandatory = table.Column<bool>(type: "tinyint(1)", nullable: false, defaultValue: false),
                     IsActive = table.Column<bool>(type: "tinyint(1)", nullable: false, defaultValue: true)
                 },
                 constraints: table =>
@@ -125,6 +140,33 @@ namespace Pivot.Migrations
                         name: "FK_PaymentPlans_Schools_SchoolId",
                         column: x => x.SchoolId,
                         principalTable: "Schools",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "MainAddOnLinks",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
+                    MainPlanId = table.Column<int>(type: "int", nullable: false),
+                    AddOnPlanId = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_MainAddOnLinks", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_MainAddOnLinks_PaymentPlans_AddOnPlanId",
+                        column: x => x.AddOnPlanId,
+                        principalTable: "PaymentPlans",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_MainAddOnLinks_PaymentPlans_MainPlanId",
+                        column: x => x.MainPlanId,
+                        principalTable: "PaymentPlans",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 })
@@ -169,6 +211,17 @@ namespace Pivot.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_MainAddOnLinks_AddOnPlanId",
+                table: "MainAddOnLinks",
+                column: "AddOnPlanId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MainAddOnLinks_MainPlanId_AddOnPlanId",
+                table: "MainAddOnLinks",
+                columns: new[] { "MainPlanId", "AddOnPlanId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_PaymentPlanItems_PaymentPlanId",
                 table: "PaymentPlanItems",
                 column: "PaymentPlanId");
@@ -179,9 +232,9 @@ namespace Pivot.Migrations
                 column: "ProgramId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_PaymentPlans_SchoolId_ProgramId_LengthWeeks_ValidFrom_ValidT~",
+                name: "IX_PaymentPlans_SchoolId_ProgramId_MinWeek_MaxWeek_PackageType",
                 table: "PaymentPlans",
-                columns: new[] { "SchoolId", "ProgramId", "LengthWeeks", "ValidFrom", "ValidTo", "PackageType" });
+                columns: new[] { "SchoolId", "ProgramId", "MinWeek", "MaxWeek", "PackageType" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Programs_SchoolId_Name",
@@ -199,6 +252,9 @@ namespace Pivot.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "MainAddOnLinks");
+
             migrationBuilder.DropTable(
                 name: "PaymentPlanItems");
 
