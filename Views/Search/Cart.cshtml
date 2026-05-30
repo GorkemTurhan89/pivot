@@ -4,6 +4,8 @@
 
 <h1 class="mb-3">Sepet</h1>
 
+<div id="memberCard" class="mb-3"></div>
+
 <div id="cartContainer">
     <p class="text-muted">Yükleniyor...</p>
 </div>
@@ -47,7 +49,28 @@
                 render(await res.json());
             }
 
+            const esc = s => String(s ?? '').replace(/</g, '&lt;');
+
+            function renderMember(c) {
+                const memberCard = document.getElementById('memberCard');
+                if (!c.member) { memberCard.innerHTML = ''; return; }
+                const m = c.member;
+                memberCard.innerHTML = `
+                    <div class="card">
+                        <div class="card-body py-3">
+                            <h6 class="card-title mb-3">Müşteri Bilgileri</h6>
+                            <div class="row g-2 small">
+                                <div class="col-md-6"><strong>Ad Soyad:</strong> ${esc(m.firstName)} ${esc(m.lastName)}</div>
+                                <div class="col-md-6"><strong>E-posta:</strong> ${esc(m.email ?? '—')}</div>
+                                <div class="col-md-6"><strong>Doğum Tarihi:</strong> ${esc(m.birthday)}</div>
+                                <div class="col-md-6"><strong>Kayıt Tarihi:</strong> ${esc(c.startDate)}</div>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
             function render(c) {
+                renderMember(c);
                 const cur = c.currency;
                 const rows = [];
 

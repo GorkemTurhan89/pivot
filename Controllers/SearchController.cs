@@ -351,6 +351,22 @@ public class SearchController : Controller
         var total = courseFinal + registration
                     + addOnLines.Sum(l => l.Amount + (l.RegistrationFee ?? 0m));
 
+        // Cart üst kart bilgisi: cartGuid verildiyse müşteri özet bilgisi yüklenir.
+        CartMemberInfo? memberInfo = null;
+        if (cartGuid.HasValue)
+        {
+            memberInfo = await _db.CartDetails.AsNoTracking()
+                .Where(c => c.CartGuid == cartGuid.Value)
+                .Select(c => new CartMemberInfo
+                {
+                    FirstName = c.Member.FirstName,
+                    LastName = c.Member.LastName,
+                    Email = c.Member.Email,
+                    Birthday = c.Member.Birthday
+                })
+                .FirstOrDefaultAsync();
+        }
+
         // CRM snapshot: cartGuid varsa CartDetail OfferCreated'a evrilir ve
         // seçili planlar ChoosenPlanDetails'a yazılır (mevcut snapshot silinir, yenisi yazılır).
         // CartGuid (sequential int yerine) ileri/geri navigasyon arası aynı sepeti güncel tutar.
@@ -439,6 +455,8 @@ public class SearchController : Controller
 
         var vm = new CartViewModel
         {
+            Member = memberInfo,
+            StartDate = startDate,
             Main = new CartMainLine
             {
                 Name = main.Name,

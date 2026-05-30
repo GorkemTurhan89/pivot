@@ -58,11 +58,22 @@ public class SupplementListItemViewModel
 
 public class CartViewModel
 {
+    // cartGuid verildiyse dolu gelir; sepet ekranının üstündeki müşteri kartı için.
+    public CartMemberInfo? Member { get; set; }
+    public DateOnly StartDate { get; set; }       // kullanıcının seçtiği "kayıt tarihi"
     public CartMainLine Main { get; set; } = new();
     public decimal? RegistrationFee { get; set; }
     public List<CartAddOnLine> AddOns { get; set; } = new();
     public decimal Total { get; set; }
     public string Currency { get; set; } = "GBP";
+}
+
+public class CartMemberInfo
+{
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public DateOnly Birthday { get; set; }
 }
 
 public class CartMainLine
