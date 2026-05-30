@@ -68,6 +68,14 @@
                             <td class="text-muted">${a.category ?? ''}</td>
                             <td class="text-end">${money(a.amount, cur)}</td>
                         </tr>`);
+                    if (a.registrationFee != null && a.registrationFee > 0) {
+                        rows.push(`
+                        <tr>
+                            <td class="ps-4 text-muted">↳ Kayıt/Yerleştirme</td>
+                            <td></td>
+                            <td class="text-end">${money(a.registrationFee, cur)}</td>
+                        </tr>`);
+                    }
                 });
 
                 container.innerHTML = `

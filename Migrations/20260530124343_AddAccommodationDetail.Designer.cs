@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Pivot.Data;
 
@@ -11,9 +12,11 @@ using Pivot.Data;
 namespace Pivot.Migrations
 {
     [DbContext(typeof(PivotDbContext))]
-    partial class PivotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260530124343_AddAccommodationDetail")]
+    partial class AddAccommodationDetail
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -29,8 +32,8 @@ namespace Pivot.Migrations
 
                     b.Property<string>("Board")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
 
                     b.Property<string>("ResidenceName")
                         .HasMaxLength(150)

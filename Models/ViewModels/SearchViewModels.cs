@@ -65,5 +65,8 @@ public class CartAddOnLine
     public string Name { get; set; } = string.Empty;
     public string? Category { get; set; }
     public decimal Amount { get; set; }
+    // Bu addon seçilince ek olarak alınan kerelik bedel (örn. konaklama yerleştirme ücreti).
+    // Tutulduğu yer: PaymentPlan.RegistrationFee (yan tabloda değil). UI'da addon altında satır olarak gösterilir.
+    public decimal? RegistrationFee { get; set; }
     public bool IsMandatory { get; set; }
 }

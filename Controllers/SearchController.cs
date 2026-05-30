@@ -220,22 +220,47 @@ public class SearchController : Controller
         }
         var discount = courseList - courseFinal;
 
-        var addOnLines = await _db.PaymentPlans
+        // BÜYÜK GEÇİŞ uzantısı: AddOn'lar artık bant fiyatlı (WeeklyListFee × weeks) ya da Total.
+        // RegistrationFee bu addon seçilince eklenen kerelik bedel (örn. konaklama yerleştirme ücreti).
+        var rawAddOns = await _db.PaymentPlans
             .Where(p => addOnIds.Contains(p.Id) && p.IsAdditional)
             .OrderByDescending(p => p.IsOrHasMandatory)
             .ThenBy(p => p.Category)
             .ThenBy(p => p.Name)
-            .Select(a => new CartAddOnLine
+            .Select(a => new
             {
-                Name = a.Name,
-                Category = a.Category,
-                Amount = a.Items.Sum(i => i.ItemPrice * i.Quantity),
-                IsMandatory = a.IsOrHasMandatory
+                a.Name,
+                a.Category,
+                a.PriceType,
+                a.WeeklyListFee,
+                a.WeeklyPromoFee,
+                a.TotalListFee,
+                a.TotalPromoFee,
+                a.RegistrationFee,
+                a.IsOrHasMandatory
             })
             .ToListAsync();
 
+        var addOnLines = rawAddOns.Select(a =>
+        {
+            decimal amount;
+            if (a.PriceType == PriceType.Weekly)
+                amount = (a.WeeklyPromoFee ?? a.WeeklyListFee ?? 0m) * weeks;
+            else
+                amount = a.TotalPromoFee ?? a.TotalListFee ?? 0m;
+            return new CartAddOnLine
+            {
+                Name = a.Name,
+                Category = a.Category,
+                Amount = amount,
+                RegistrationFee = a.RegistrationFee,
+                IsMandatory = a.IsOrHasMandatory
+            };
+        }).ToList();
+
         var registration = main.RegistrationFee ?? 0m;
-        var total = courseFinal + registration + addOnLines.Sum(l => l.Amount);
+        var total = courseFinal + registration
+                    + addOnLines.Sum(l => l.Amount + (l.RegistrationFee ?? 0m));
 
         var vm = new CartViewModel
         {
