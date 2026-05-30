@@ -41,6 +41,20 @@ public class AddOnListItemViewModel
     public bool IsMandatory { get; set; }
 }
 
+// Bir accommodation seçildiğinde dinamik olarak getirilen supplement satırı.
+public class SupplementListItemViewModel
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;       // "Summer Supplement"
+    public string AppliesTo { get; set; } = string.Empty;  // "Homestay"
+    public decimal WeeklyFee { get; set; }
+    public string Currency { get; set; } = string.Empty;
+    public bool IsConditional { get; set; }                // Required == "Conditional"
+    public string? ConditionNotes { get; set; }            // Conditional ise popup'ta gösterilecek
+    public DateOnly? StartDate { get; set; }
+    public DateOnly? EndDate { get; set; }
+}
+
 public class CartViewModel
 {
     public CartMainLine Main { get; set; } = new();

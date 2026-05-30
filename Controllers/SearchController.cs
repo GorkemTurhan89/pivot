@@ -151,6 +151,7 @@ public class SearchController : Controller
             .Where(p => p.IsAdditional
                 && p.IsActive
                 && p.SchoolId == schoolId
+                && p.Category != "Supplement"   // Supplement'lar accommodation seçilince dinamik gelir.
                 && (_db.MainAddOnLinks.Any(l => l.AddOnPlanId == p.Id && l.MainPlanId == mainPlanId)
                     || !_db.MainAddOnLinks.Any(l => l.AddOnPlanId == p.Id)))
             .OrderByDescending(p => p.IsOrHasMandatory)
@@ -169,6 +170,44 @@ public class SearchController : Controller
             .ToListAsync();
 
         return Json(addOns);
+    }
+
+    // Bir accommodation seçildiğinde uygulanabilir supplement'ları döner.
+    // Eşleşme: SupplementDetail.(School, Country, Campus, AppliesTo) ==
+    //          AccommodationDetail.(School, Country, Campus, Type)
+    [HttpGet]
+    public async Task<IActionResult> GetSupplements(int accommodationId)
+    {
+        var acc = await _db.AccommodationDetails
+            .Where(d => d.PaymentPlanId == accommodationId)
+            .Select(d => new { d.School, d.Country, d.Campus, d.Type,
+                               Currency = d.PaymentPlan.School.City.Country.Currency })
+            .FirstOrDefaultAsync();
+
+        if (acc == null) return Json(Array.Empty<SupplementListItemViewModel>());
+
+        var supps = await _db.SupplementDetails
+            .Where(s => s.School == acc.School
+                     && s.Country == acc.Country
+                     && s.Campus == acc.Campus
+                     && s.AppliesTo == acc.Type
+                     && s.PaymentPlan.IsActive)
+            .OrderBy(s => s.SupplementName)
+            .Select(s => new SupplementListItemViewModel
+            {
+                Id = s.PaymentPlanId,
+                Name = s.SupplementName,
+                AppliesTo = s.AppliesTo,
+                WeeklyFee = s.PaymentPlan.WeeklyListFee ?? 0m,
+                Currency = acc.Currency,
+                IsConditional = s.Required == "Conditional",
+                ConditionNotes = s.Notes,
+                StartDate = s.StartDate,
+                EndDate = s.EndDate
+            })
+            .ToListAsync();
+
+        return Json(supps);
     }
 
     public IActionResult Cart()

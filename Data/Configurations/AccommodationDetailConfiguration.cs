@@ -18,6 +18,15 @@ public class AccommodationDetailConfiguration : IEntityTypeConfiguration<Accommo
         builder.Property(d => d.Board).IsRequired().HasMaxLength(50);
         builder.Property(d => d.ResidenceName).HasMaxLength(150);
 
+        builder.Property(d => d.School).IsRequired().HasMaxLength(50);
+        builder.Property(d => d.Country).IsRequired().HasMaxLength(100);
+        builder.Property(d => d.Campus).IsRequired().HasMaxLength(100);
+        builder.Property(d => d.Required).IsRequired().HasMaxLength(50);
+        builder.Property(d => d.DisplayOption).IsRequired().HasMaxLength(300);
+
+        // Supplement eşleşmesi sık yapılacak; compound index düşürmek isterse:
+        builder.HasIndex(d => new { d.School, d.Country, d.Campus, d.Type });
+
         builder.HasOne(d => d.PaymentPlan)
             .WithOne()
             .HasForeignKey<AccommodationDetail>(d => d.PaymentPlanId)

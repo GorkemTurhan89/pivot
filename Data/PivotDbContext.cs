@@ -15,6 +15,7 @@ public class PivotDbContext : DbContext
     public DbSet<PaymentPlanItem> PaymentPlanItems => Set<PaymentPlanItem>();
     public DbSet<MainAddOnLink> MainAddOnLinks => Set<MainAddOnLink>();
     public DbSet<AccommodationDetail> AccommodationDetails => Set<AccommodationDetail>();
+    public DbSet<SupplementDetail> SupplementDetails => Set<SupplementDetail>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

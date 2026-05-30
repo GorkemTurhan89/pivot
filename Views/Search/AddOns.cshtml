@@ -15,6 +15,26 @@
     <button id="continueBtn" class="btn btn-primary" disabled>Sepeti görüntüle</button>
 </div>
 
+<div class="modal fade" id="conditionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Koşullu Ek Hizmet</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong id="condTitle"></strong></p>
+                <p id="condNotes" class="text-muted"></p>
+                <p class="small mb-0"><em>Bu koşulun sizin durumunuza uygun olduğunu onaylarsanız ek hizmeti seçebilirsiniz.</em></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="button" id="condConfirmBtn" class="btn btn-danger">Koşul benim için geçerli</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         (function () {
@@ -39,10 +59,13 @@
             const continueBtn = document.getElementById('continueBtn');
             continueBtn.disabled = false;
             continueBtn.addEventListener('click', () => {
-                const ids = [...document.querySelectorAll('.addon-check:checked')].map(c => parseInt(c.value, 10));
+                const ids = [...document.querySelectorAll('.addon-check:checked, .supp-check:checked')]
+                    .map(c => parseInt(c.value, 10));
                 localStorage.setItem('pivot.selectedAddOns', JSON.stringify(ids));
                 window.location.href = '/Search/Cart';
             });
+
+            const fmt = v => Number(v).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             async function load() {
                 const res = await fetch(`/Search/GetAddOns?schoolId=${sel.schoolId}&mainPlanId=${sel.mainPlanId}`);
@@ -58,8 +81,10 @@
                     container.innerHTML = '<p class="text-muted">Bu paket için ek hizmet bulunmuyor.</p>';
                     return;
                 }
-                const rows = addOns.map(a => `
-                    <tr>
+                const rows = addOns.map(a => {
+                    const isKonaklama = (a.category || '').toLowerCase() === 'konaklama';
+                    return `
+                    <tr data-addon-id="${a.id}" ${isKonaklama ? 'data-accommodation="1"' : ''}>
                         <td>
                             <input type="checkbox" class="form-check-input addon-check"
                                    value="${a.id}" ${a.isMandatory ? 'checked disabled' : ''} />
@@ -69,8 +94,9 @@
                             ${a.isMandatory ? '<span class="badge bg-danger ms-1">Zorunlu</span>' : ''}
                         </td>
                         <td>${a.category ?? ''}</td>
-                        <td class="text-end">${a.price.toLocaleString('tr-TR')} ${a.currency}</td>
-                    </tr>`).join('');
+                        <td class="text-end">${fmt(a.price)} ${a.currency}</td>
+                    </tr>`;
+                }).join('');
 
                 container.innerHTML = `
                     <table class="table table-hover align-middle">
@@ -84,7 +110,100 @@
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
-                    <small class="text-muted">Zorunlu hizmetler otomatik seçilidir ve kaldırılamaz.</small>`;
+                    <small class="text-muted">Zorunlu hizmetler otomatik seçilidir ve kaldırılamaz. Konaklama seçtiğinizde uygulanabilir ek hizmetler (supplement) altında görünür.</small>`;
+
+                wireAccommodationSupplements();
+                wireConditionLocks();
+            }
+
+            // Bir accommodation check edilince supplement'larını dinamik getir, uncheck edilince kaldır.
+            function wireAccommodationSupplements() {
+                container.querySelectorAll('tr[data-accommodation="1"] .addon-check').forEach(cb => {
+                    cb.addEventListener('change', async (e) => {
+                        const row = e.target.closest('tr');
+                        const accId = parseInt(row.dataset.addonId, 10);
+                        if (e.target.checked) {
+                            await loadSupplementsAfter(row, accId);
+                        } else {
+                            removeSupplementsAfter(row, accId);
+                        }
+                    });
+                });
+            }
+
+            async function loadSupplementsAfter(accRow, accId) {
+                const res = await fetch(`/Search/GetSupplements?accommodationId=${accId}`);
+                if (!res.ok) return;
+                const supps = await res.json();
+                if (!supps.length) return;
+                let after = accRow;
+                supps.forEach(s => {
+                    const dateRange = (s.startDate || s.endDate)
+                        ? `<small class="text-muted ms-1">(${s.startDate ?? ''}${s.endDate ? ' → ' + s.endDate : ''})</small>`
+                        : '';
+                    const conditional = s.isConditional;
+                    const rowClass = conditional ? 'supp-row table-danger' : 'supp-row table-warning';
+                    const lockIcon = conditional
+                        ? `<button type="button" class="btn btn-sm btn-link p-0 ms-2 cond-lock"
+                                   data-supp-id="${s.id}" data-name="${escapeAttr(s.name)}"
+                                   data-notes="${escapeAttr(s.conditionNotes ?? '')}" title="Koşulu gör">🔒</button>`
+                        : '';
+                    const html = `
+                        <tr class="${rowClass}" data-supp-of="${accId}" data-supp-id="${s.id}">
+                            <td class="ps-4">
+                                <input type="checkbox" class="form-check-input supp-check"
+                                       value="${s.id}" ${conditional ? 'disabled' : ''} />
+                            </td>
+                            <td>↳ ${s.name} ${dateRange} ${lockIcon}</td>
+                            <td>Supplement / ${s.appliesTo}</td>
+                            <td class="text-end">${fmt(s.weeklyFee)} ${s.currency}/hafta</td>
+                        </tr>`;
+                    after.insertAdjacentHTML('afterend', html);
+                    after = after.nextElementSibling;
+                });
+                wireConditionLocks();
+            }
+
+            function removeSupplementsAfter(accRow, accId) {
+                container.querySelectorAll(`tr.supp-row[data-supp-of="${accId}"]`).forEach(r => r.remove());
+            }
+
+            function wireConditionLocks() {
+                container.querySelectorAll('.cond-lock').forEach(btn => {
+                    if (btn.dataset.wired) return;
+                    btn.dataset.wired = '1';
+                    btn.addEventListener('click', () => openConditionModal(btn));
+                });
+            }
+
+            let activeLock = null;
+            const condModalEl = document.getElementById('conditionModal');
+            const condModal = new bootstrap.Modal(condModalEl);
+            document.getElementById('condConfirmBtn').addEventListener('click', () => {
+                if (!activeLock) return;
+                const suppId = activeLock.dataset.suppId;
+                const row = container.querySelector(`tr.supp-row[data-supp-id="${suppId}"]`);
+                if (row) {
+                    const cb = row.querySelector('.supp-check');
+                    cb.disabled = false;
+                    cb.checked = true;
+                    row.classList.remove('table-danger');
+                    row.classList.add('table-warning');
+                    activeLock.remove();
+                }
+                activeLock = null;
+                condModal.hide();
+            });
+
+            function openConditionModal(btn) {
+                activeLock = btn;
+                document.getElementById('condTitle').textContent = btn.dataset.name;
+                document.getElementById('condNotes').textContent = btn.dataset.notes || '(koşul açıklaması yok)';
+                condModal.show();
+            }
+
+            function escapeAttr(s) {
+                return String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;');
             }
 
             load();

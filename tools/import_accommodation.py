@@ -84,8 +84,9 @@ plan_sql = """INSERT INTO PaymentPlans
 VALUES (%s, NULL, %s, %s, %s, 1, %s, %s, 2, 1, 'Konaklama', 0, 1)"""
 
 detail_sql = """INSERT INTO AccommodationDetails
-(PaymentPlanId, Type, RoomType, Board, ResidenceName)
-VALUES (%s, %s, %s, %s, %s)"""
+(PaymentPlanId, Type, RoomType, Board, ResidenceName,
+ School, Country, Campus, Required, DisplayOption)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
 
 ins = 0; skipped = 0
 for r in ws.iter_rows(min_row=2, values_only=True):
@@ -114,7 +115,8 @@ for r in ws.iter_rows(min_row=2, values_only=True):
 
     cur.execute(plan_sql, (sid, name, min_w, max_w, float(weekly), reg_fee))
     pid = cur.lastrowid
-    cur.execute(detail_sql, (pid, atype, room, board, resname))
+    cur.execute(detail_sql, (pid, atype, room, board, resname,
+                             school, country, campus, req_status, name))
     ins += 1
 
 conn.commit()
