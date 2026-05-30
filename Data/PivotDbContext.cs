@@ -24,6 +24,12 @@ public class PivotDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PivotDbContext).Assembly);
+
+        foreach (var entity in modelBuilder.Model.GetEntityTypes())
+        {
+            entity.SetTableName(entity.GetTableName()!.ToLower());
+        }
+
         base.OnModelCreating(modelBuilder);
     }
 }
