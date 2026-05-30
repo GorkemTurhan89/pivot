@@ -85,6 +85,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                <button type="button" id="useExistingBtn" class="btn btn-primary">Bu kayıt ile devam et</button>
             </div>
         </div>
     </div>
@@ -149,9 +150,30 @@
                 showDetailBtn.classList.add('d-none');
             });
 
+            let activeMemberId = null;
+            const useExistingBtn = document.getElementById('useExistingBtn');
+            useExistingBtn.addEventListener('click', async () => {
+                if (!activeMemberId) return;
+                useExistingBtn.disabled = true;
+                try {
+                    const res = await fetch('/Lead/UseExisting?memberId=' + activeMemberId, { method: 'POST' });
+                    if (!res.ok) { alert('Devam edilemedi.'); return; }
+                    const data = await res.json();
+                    // Yeni cart oturumu (üye aynı) — pivot.lead güncellenir, eski selection/addons temizlenir.
+                    localStorage.setItem('pivot.lead', JSON.stringify(data));
+                    localStorage.removeItem('pivot.selection');
+                    localStorage.removeItem('pivot.selectedAddOns');
+                    localStorage.removeItem('pivot.addOnWeeks');
+                    window.location.href = '/Search/Index';
+                } finally {
+                    useExistingBtn.disabled = false;
+                }
+            });
+
             function showDuplicate(field, member) {
+                activeMemberId = member.id;
                 const label = field === 'email' ? 'E-posta' : 'Telefon';
-                dupMessage.textContent = `${label} bilgisiyle daha önce kayıt yapılmış. Aynı bilgi ile yeni kayıt oluşturulamaz.`;
+                dupMessage.textContent = `${label} bilgisiyle daha önce kayıt yapılmış. Aynı bilgi ile yeni üye oluşturulamaz; mevcut üyeyle yeni bir teklif başlatabilirsiniz.`;
                 dupDetail.classList.add('d-none');
                 showDetailBtn.classList.remove('d-none');
                 dupDetailBody.innerHTML = `

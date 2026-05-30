@@ -38,20 +38,21 @@ public class LeadController : Controller
             || string.IsNullOrEmpty(input.Nationality))
             return BadRequest(new { error = "Ad, Soyad ve Uyruk zorunludur." });
 
-        // Uniqueness pre-check; çakışırsa mevcut kaydı döner (popup'ta Detay için).
-        if (!string.IsNullOrEmpty(input.Email))
-        {
-            var existing = await _db.MemberDetails.AsNoTracking()
-                .FirstOrDefaultAsync(m => m.Email == input.Email);
-            if (existing != null)
-                return Conflict(new { duplicateField = "email", existingMember = existing });
-        }
+        // Uniqueness pre-check; çakışırsa mevcut kaydı döner (popup "Bu kayıt ile devam et" için).
+        // Phone primary identifier — önce phone bakılır, sonra email (çakışırsa hangisi raporlanır net olsun).
         if (!string.IsNullOrEmpty(input.PhoneNumber))
         {
             var existing = await _db.MemberDetails.AsNoTracking()
                 .FirstOrDefaultAsync(m => m.PhoneNumber == input.PhoneNumber);
             if (existing != null)
                 return Conflict(new { duplicateField = "phone", existingMember = existing });
+        }
+        if (!string.IsNullOrEmpty(input.Email))
+        {
+            var existing = await _db.MemberDetails.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.Email == input.Email);
+            if (existing != null)
+                return Conflict(new { duplicateField = "email", existingMember = existing });
         }
 
         input.Id = 0;
@@ -79,5 +80,33 @@ public class LeadController : Controller
         await _db.SaveChangesAsync();
 
         return Ok(new { memberId = input.Id, cartDetailId = cart.Id, cartGuid = cart.CartGuid });
+    }
+
+    // Mevcut üye ile YENİ teklif başlat: member tablosuna dokunmadan (formdaki değerlerle
+    // güncelleme YAPILMAZ — üye güncelleme ayrı bir ekranın işi) yeni bir CartDetail yaratır.
+    [HttpPost]
+    public async Task<IActionResult> UseExisting([FromQuery] int memberId)
+    {
+        var member = await _db.MemberDetails.FindAsync(memberId);
+        if (member == null) return NotFound(new { error = "Üye bulunamadı." });
+
+        var cart = new CartDetail
+        {
+            MemberId = member.Id,
+            PersonalId = member.PersonalId,
+            RegisterDate = DateOnly.FromDateTime(member.CreatedAt),
+            Nationality = member.Nationality,
+            Email = member.Email,
+            PhoneNumber = member.PhoneNumber,
+            Status = CartStatus.LeadCreated,
+            CreateDate = DateTime.UtcNow,
+            UpdateDate = DateTime.UtcNow,
+            CartGuid = Guid.NewGuid(),
+            TotalPaymentPrice = 0m
+        };
+        _db.CartDetails.Add(cart);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { memberId = member.Id, cartDetailId = cart.Id, cartGuid = cart.CartGuid });
     }
 }
