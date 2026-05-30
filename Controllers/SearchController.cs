@@ -154,7 +154,9 @@ public class SearchController : Controller
     {
         // Okul bazlı ek paketler: ya bu ana pakete bağlı (link var) ya da hiçbir ana pakete
         // bağlı olmayan okul geneli opsiyoneller. Başka bir varyanta özel bağlı olanlar dışlanır.
-        var addOns = await _db.PaymentPlans
+        // BÜYÜK GEÇİŞ sonrası: addon fiyatları bant alanlarında (Weekly: WeeklyListFee, FixedTotal: TotalListFee);
+        // currency Country.Currency'den. Eski Items.Sum mantığı ÖLDÜ (Excel-import addon'larda item yok).
+        var raw = await _db.PaymentPlans
             .Where(p => p.IsAdditional
                 && p.IsActive
                 && p.SchoolId == schoolId
@@ -164,17 +166,30 @@ public class SearchController : Controller
             .OrderByDescending(p => p.IsOrHasMandatory)
             .ThenBy(p => p.Category)
             .ThenBy(p => p.Name)
-            .Select(p => new AddOnListItemViewModel
+            .Select(p => new
             {
-                Id = p.Id,
-                Name = p.Name,
-                Category = p.Category,
-                Price = p.Items.Sum(i => i.ItemPrice * i.Quantity),
-                Currency = p.Items.Select(i => i.Currency).FirstOrDefault() ?? "GBP",
-                IsMandatory = p.IsOrHasMandatory
+                p.Id,
+                p.Name,
+                p.Category,
+                p.PriceType,
+                p.WeeklyListFee,
+                p.TotalListFee,
+                Currency = p.School.City.Country.Currency,
+                IsMandatoryForThisMain = p.IsOrHasMandatory
                     && _db.MainAddOnLinks.Any(l => l.AddOnPlanId == p.Id && l.MainPlanId == mainPlanId)
             })
             .ToListAsync();
+
+        var addOns = raw.Select(p => new AddOnListItemViewModel
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Category = p.Category,
+            PriceType = p.PriceType.ToString(),
+            Price = p.PriceType == PriceType.Weekly ? (p.WeeklyListFee ?? 0m) : (p.TotalListFee ?? 0m),
+            Currency = p.Currency,
+            IsMandatory = p.IsMandatoryForThisMain
+        }).ToList();
 
         return Json(addOns);
     }

@@ -36,8 +36,9 @@ public class AddOnListItemViewModel
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Category { get; set; }
-    public decimal Price { get; set; }
-    public string Currency { get; set; } = "GBP";
+    public string PriceType { get; set; } = "Weekly"; // "Weekly" | "FixedTotal"
+    public decimal Price { get; set; }                 // Weekly: haftalık ücret / FixedTotal: sabit toplam
+    public string Currency { get; set; } = string.Empty;
     public bool IsMandatory { get; set; }
 }
 

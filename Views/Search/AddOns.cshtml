@@ -94,7 +94,7 @@
                             ${a.isMandatory ? '<span class="badge bg-danger ms-1">Zorunlu</span>' : ''}
                         </td>
                         <td>${a.category ?? ''}</td>
-                        <td class="text-end">${fmt(a.price)} ${a.currency}</td>
+                        <td class="text-end">${fmt(a.price)} ${a.currency}${a.priceType === 'Weekly' ? '/hafta' : ''}</td>
                     </tr>`;
                 }).join('');
 
