@@ -11,17 +11,29 @@
             <div asp-validation-summary="ModelOnly" class="text-danger small mb-2"></div>
 
             <div class="mb-3">
-                <label for="username" class="form-label">Kullanıcı adı</label>
-                <input type="text" id="username" name="username" class="form-control" required autofocus autocomplete="username" />
+                <label for="usernameOrEmail" class="form-label">Kullanıcı adı veya e-posta</label>
+                <input type="text" id="usernameOrEmail" name="usernameOrEmail" class="form-control" required autofocus autocomplete="username" />
             </div>
             <div class="mb-3">
                 <label for="password" class="form-label">Şifre</label>
-                <input type="password" id="password" name="password" class="form-control" required autocomplete="current-password" />
+                <div class="input-group">
+                    <input type="password" id="password" name="password" class="form-control" required autocomplete="current-password" />
+                    <span class="input-group-text password-peek" data-target="password"
+                          style="cursor:pointer;user-select:none;" title="Üstüne gelince göster">👁</span>
+                </div>
             </div>
             <button type="submit" class="btn btn-primary w-100">Giriş</button>
         </form>
-        <p class="text-muted small mt-3">
-            Geliştirme stub'ı: <code>admin</code> / <code>admin</code>. Gerçek kullanıcı tablosu sonraki adımda gelecek.
-        </p>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.password-peek').forEach(eye => {
+            const input = document.getElementById(eye.dataset.target);
+            if (!input) return;
+            eye.addEventListener('mouseenter', () => input.type = 'text');
+            eye.addEventListener('mouseleave', () => input.type = 'password');
+        });
+    </script>
+}

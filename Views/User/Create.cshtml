@@ -1,0 +1,52 @@
+@{
+    ViewData["Title"] = "Yeni Kullanıcı";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <h1 class="mb-3">Yeni kullanıcı</h1>
+        <form method="post" asp-action="Create" novalidate>
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger small mb-2"></div>
+
+            <div class="mb-3">
+                <label for="username" class="form-label">Kullanıcı adı</label>
+                <input type="text" id="username" name="username" class="form-control" required autocomplete="off" />
+            </div>
+            <div class="mb-3">
+                <label for="email" class="form-label">E-posta</label>
+                <input type="email" id="email" name="email" class="form-control" required autocomplete="off" />
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Şifre</label>
+                <div class="input-group">
+                    <input type="password" id="password" name="password" class="form-control" required minlength="8" autocomplete="new-password" />
+                    <span class="input-group-text password-peek" data-target="password"
+                          style="cursor:pointer;user-select:none;" title="Üstüne gelince göster">👁</span>
+                </div>
+                <small class="text-muted">Min 8 karakter.</small>
+            </div>
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="isSuperAdmin" name="isSuperAdmin" value="true" />
+                <label class="form-check-label" for="isSuperAdmin">Super admin (tüm kullanıcı yönetim yetkisi)</label>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Oluştur</button>
+                <a asp-action="Index" class="btn btn-secondary">İptal</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Şifre input'unun yanındaki 👁 ikonuna hover edince input type=text olur, çıkınca password.
+        document.querySelectorAll('.password-peek').forEach(eye => {
+            const input = document.getElementById(eye.dataset.target);
+            if (!input) return;
+            eye.addEventListener('mouseenter', () => input.type = 'text');
+            eye.addEventListener('mouseleave', () => input.type = 'password');
+        });
+    </script>
+}

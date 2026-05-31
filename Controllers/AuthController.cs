@@ -2,21 +2,30 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Pivot.Data;
+using Pivot.Models.Entities;
 
 namespace Pivot.Controllers;
 
 [AllowAnonymous]
 public class AuthController : Controller
 {
-    private const string TokenCookieName = "access_token";
+    public const string TokenCookieName = "access_token";
+    public const string SuperAdminClaimType = "is_super_admin";
 
     private readonly IConfiguration _config;
+    private readonly PivotDbContext _db;
+    private readonly IPasswordHasher<User> _hasher;
 
-    public AuthController(IConfiguration config)
+    public AuthController(IConfiguration config, PivotDbContext db, IPasswordHasher<User> hasher)
     {
         _config = config;
+        _db = db;
+        _hasher = hasher;
     }
 
     [HttpGet]
@@ -28,28 +37,51 @@ public class AuthController : Controller
         return View();
     }
 
-    // STUB: gerçek Users tablosu sonraki alt-adımda gelecek. Şimdilik hardcoded admin/admin.
+    // Login: username VEYA email + password. PasswordHasher rehash önerirse hash'i yeniler.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Login(string username, string password, string? returnUrl = null)
+    public async Task<IActionResult> Login(string usernameOrEmail, string password, string? returnUrl = null)
     {
-        if (username == "admin" && password == "admin")
+        usernameOrEmail = (usernameOrEmail ?? "").Trim();
+        if (string.IsNullOrEmpty(usernameOrEmail) || string.IsNullOrEmpty(password))
         {
-            var token = IssueToken(username, role: "Admin", out var expires);
-            Response.Cookies.Append(TokenCookieName, token, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict,
-                Expires = expires
-            });
-
-            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
-                return Redirect(returnUrl);
-            return RedirectToAction("Index", "Home");
+            ModelState.AddModelError(string.Empty, "Kullanıcı adı/e-posta ve şifre zorunlu.");
+            ViewData["ReturnUrl"] = returnUrl;
+            return View();
         }
 
-        ModelState.AddModelError(string.Empty, "Kullanıcı adı veya şifre hatalı.");
+        var user = await _db.Users.FirstOrDefaultAsync(u =>
+            u.Username == usernameOrEmail || u.Email == usernameOrEmail);
+
+        if (user != null)
+        {
+            var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, password);
+            if (result == PasswordVerificationResult.Success ||
+                result == PasswordVerificationResult.SuccessRehashNeeded)
+            {
+                if (result == PasswordVerificationResult.SuccessRehashNeeded)
+                {
+                    user.PasswordHash = _hasher.HashPassword(user, password);
+                    user.UpdatedAt = DateTime.UtcNow;
+                    await _db.SaveChangesAsync();
+                }
+
+                var token = IssueToken(user, out var expires);
+                Response.Cookies.Append(TokenCookieName, token, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = expires
+                });
+
+                if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                    return Redirect(returnUrl);
+                return RedirectToAction("Index", "Home");
+            }
+        }
+
+        ModelState.AddModelError(string.Empty, "Kullanıcı adı/e-posta veya şifre hatalı.");
         ViewData["ReturnUrl"] = returnUrl;
         return View();
     }
@@ -62,17 +94,20 @@ public class AuthController : Controller
         return RedirectToAction(nameof(Login));
     }
 
-    private string IssueToken(string username, string role, out DateTimeOffset expiresAt)
+    private string IssueToken(User user, out DateTimeOffset expiresAt)
     {
         var jwt = _config.GetSection("Jwt");
         var keyBytes = Encoding.UTF8.GetBytes(jwt["SigningKey"]!);
         var expiryMinutes = int.Parse(jwt["ExpiryMinutes"] ?? "60");
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.Name, username),
-            new Claim(ClaimTypes.Role, role)
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.Username),
+            new(ClaimTypes.Email, user.Email),
+            new(SuperAdminClaimType, user.IsSuperAdmin ? "true" : "false")
         };
+
         var expiry = DateTime.UtcNow.AddMinutes(expiryMinutes);
         var token = new JwtSecurityToken(
             issuer: jwt["Issuer"],

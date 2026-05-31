@@ -1,9 +1,11 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Pivot.Data;
+using Pivot.Models.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +16,8 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddDbContext<PivotDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 // JWT bearer gateway: token Authorization header'da ya da "access_token" HttpOnly cookie'sinde olabilir.
 // Browser navigation cookie'yi otomatik gönderir; cshtml + fetch ayrımı yapmaksızın tek doğrulama yolu.
