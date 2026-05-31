@@ -1,0 +1,39 @@
+@model Pivot.Models.Entities.User
+@{
+    ViewData["Title"] = "Rol Düzenle";
+    var roles = (IReadOnlyList<string>)ViewData["Roles"]!;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <h1 class="mb-3">Rol düzenle</h1>
+        <p class="text-muted"><strong>@Model.Username</strong> kullanıcısının rolünü değiştir.</p>
+
+        <form method="post" asp-action="EditRole" asp-route-id="@Model.Id" novalidate>
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger small mb-2"></div>
+
+            <div class="mb-3">
+                <label for="role" class="form-label">Rol</label>
+                <select id="role" name="role" class="form-select" required>
+                    @foreach (var r in roles)
+                    {
+                        if (r == Model.Role)
+                        {
+                            <option value="@r" selected>@r</option>
+                        }
+                        else
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Güncelle</button>
+                <a asp-action="Index" class="btn btn-secondary">İptal</a>
+            </div>
+        </form>
+    </div>
+</div>

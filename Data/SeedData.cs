@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Pivot.Models.Auth;
 using Pivot.Models.Entities;
 
 namespace Pivot.Data;
@@ -17,13 +18,13 @@ public static class SeedData
 
     private static async Task EnsureSuperAdminAsync(PivotDbContext db)
     {
-        if (await db.Users.AnyAsync(u => u.IsSuperAdmin)) return;
+        if (await db.Users.AnyAsync(u => u.Role == Roles.SuperAdmin)) return;
 
         var user = new User
         {
             Username = "admin",
             Email = "admin@admin.com",
-            IsSuperAdmin = true,
+            Role = Roles.SuperAdmin,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

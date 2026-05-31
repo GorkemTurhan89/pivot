@@ -30,7 +30,8 @@
                             @* fresh=1 ile gelinince Search/Index localStorage'ı temizler (yeni sepet oturumu) *@
                             <a class="nav-link text-dark" asp-area="" asp-controller="Search" asp-action="Index" asp-route-fresh="1">Paket Arama</a>
                         </li>
-                        @if (User?.HasClaim(Pivot.Controllers.AuthController.SuperAdminClaimType, "true") == true)
+                        @if (User?.IsInRole(Pivot.Models.Auth.Roles.SuperAdmin) == true
+                             || User?.IsInRole(Pivot.Models.Auth.Roles.Admin) == true)
                         {
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-area="" asp-controller="User" asp-action="Index">Kullanıcılar</a>

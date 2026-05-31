@@ -15,7 +15,6 @@ namespace Pivot.Controllers;
 public class AuthController : Controller
 {
     public const string TokenCookieName = "access_token";
-    public const string SuperAdminClaimType = "is_super_admin";
 
     private readonly IConfiguration _config;
     private readonly PivotDbContext _db;
@@ -105,7 +104,7 @@ public class AuthController : Controller
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Username),
             new(ClaimTypes.Email, user.Email),
-            new(SuperAdminClaimType, user.IsSuperAdmin ? "true" : "false")
+            new(ClaimTypes.Role, user.Role)
         };
 
         var expiry = DateTime.UtcNow.AddMinutes(expiryMinutes);

@@ -1,13 +1,18 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Pivot.Data;
+using Pivot.Models.Auth;
 using Pivot.Models.Entities;
 
 namespace Pivot.Controllers;
 
-// Sadece super admin'in erişebileceği kullanıcı yönetim ekranları.
-// Yetki/rol matrisi sonraki iş; şu an gateway'de role check'i YOK — inline guard.
+// Kullanıcı yönetimi: SuperAdmin ve Admin erişebilir. Yetki matrisi:
+// - SuperAdmin: tek olmalı (seed'de gelen). Admin ve SalesRep yaratabilir/şifre sıfırlayabilir/rol değiştirebilir.
+//   Hiç kimseye SuperAdmin rolü atayamaz (single-SuperAdmin invariant).
+// - Admin: sadece SalesRep yaratabilir + SalesRep şifre sıfırlayabilir. Rol değiştirme yok.
+[Authorize(Roles = $"{Roles.SuperAdmin},{Roles.Admin}")]
 public class UserController : Controller
 {
     private readonly PivotDbContext _db;
@@ -19,39 +24,47 @@ public class UserController : Controller
         _hasher = hasher;
     }
 
-    private bool IsSuperAdmin() =>
-        User.HasClaim(AuthController.SuperAdminClaimType, "true");
+    private bool IsSuperAdmin() => User.IsInRole(Roles.SuperAdmin);
 
-    private IActionResult? GuardSuperAdmin()
-    {
-        if (!IsSuperAdmin())
-            return Forbid();
-        return null;
-    }
+    // Görüntüleyen rolün hedef kullanıcıya işlem yapabileceği rolleri döner.
+    // SuperAdmin: Admin ve SalesRep (SuperAdmin değişmez — tek olmalı).
+    // Admin: yalnız SalesRep.
+    private IReadOnlyList<string> AssignableRoles() =>
+        IsSuperAdmin()
+            ? new[] { Roles.Admin, Roles.SalesRep }
+            : new[] { Roles.SalesRep };
+
+    private bool CanManage(string targetRole) =>
+        IsSuperAdmin()
+            ? targetRole != Roles.SuperAdmin   // SuperAdmin kendi rolüne dokunamaz / SuperAdmin yaratamaz
+            : targetRole == Roles.SalesRep;     // Admin yalnız SalesRep'i yönetir
 
     [HttpGet]
     public async Task<IActionResult> Index()
     {
-        if (GuardSuperAdmin() is { } forbid) return forbid;
         var users = await _db.Users.OrderBy(u => u.Id).ToListAsync();
+        ViewData["IsSuperAdmin"] = IsSuperAdmin();
         return View(users);
     }
 
     [HttpGet]
     public IActionResult Create()
     {
-        if (GuardSuperAdmin() is { } forbid) return forbid;
+        ViewData["Roles"] = AssignableRoles();
         return View();
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(string username, string email, string password, bool isSuperAdmin = false)
+    public async Task<IActionResult> Create(string username, string email, string password, string role)
     {
-        if (GuardSuperAdmin() is { } forbid) return forbid;
-
         username = (username ?? "").Trim();
         email = (email ?? "").Trim();
+        role = (role ?? "").Trim();
+
+        var assignable = AssignableRoles();
+        ViewData["Roles"] = assignable;
+
         if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password))
         {
             ModelState.AddModelError(string.Empty, "Tüm alanlar zorunlu.");
@@ -60,6 +73,11 @@ public class UserController : Controller
         if (password.Length < 8)
         {
             ModelState.AddModelError(string.Empty, "Şifre en az 8 karakter olmalı.");
+            return View();
+        }
+        if (!assignable.Contains(role))
+        {
+            ModelState.AddModelError(string.Empty, "Bu rolü atama yetkin yok.");
             return View();
         }
 
@@ -78,7 +96,7 @@ public class UserController : Controller
         {
             Username = username,
             Email = email,
-            IsSuperAdmin = isSuperAdmin,
+            Role = role,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -92,9 +110,10 @@ public class UserController : Controller
     [HttpGet]
     public async Task<IActionResult> ResetPassword(int id)
     {
-        if (GuardSuperAdmin() is { } forbid) return forbid;
         var user = await _db.Users.FindAsync(id);
         if (user == null) return NotFound();
+        if (!CanManage(user.Role)) return Forbid();
+
         ViewData["UserId"] = user.Id;
         ViewData["Username"] = user.Username;
         return View();
@@ -104,9 +123,9 @@ public class UserController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ResetPassword(int id, string password)
     {
-        if (GuardSuperAdmin() is { } forbid) return forbid;
         var user = await _db.Users.FindAsync(id);
         if (user == null) return NotFound();
+        if (!CanManage(user.Role)) return Forbid();
 
         if (string.IsNullOrEmpty(password) || password.Length < 8)
         {
@@ -117,6 +136,43 @@ public class UserController : Controller
         }
 
         user.PasswordHash = _hasher.HashPassword(user, password);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
+    }
+
+    // EditRole sadece SuperAdmin'e açık. SuperAdmin Admin↔SalesRep arası geçiş yapabilir.
+    [Authorize(Roles = Roles.SuperAdmin)]
+    [HttpGet]
+    public async Task<IActionResult> EditRole(int id)
+    {
+        var user = await _db.Users.FindAsync(id);
+        if (user == null) return NotFound();
+        if (user.Role == Roles.SuperAdmin) return Forbid();  // SuperAdmin rolüne dokunulmaz.
+
+        ViewData["Roles"] = AssignableRoles();
+        return View(user);
+    }
+
+    [Authorize(Roles = Roles.SuperAdmin)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditRole(int id, string role)
+    {
+        var user = await _db.Users.FindAsync(id);
+        if (user == null) return NotFound();
+        if (user.Role == Roles.SuperAdmin) return Forbid();
+
+        role = (role ?? "").Trim();
+        var assignable = AssignableRoles();
+        if (!assignable.Contains(role))
+        {
+            ModelState.AddModelError(string.Empty, "Bu rolü atama yetkin yok.");
+            ViewData["Roles"] = assignable;
+            return View(user);
+        }
+
+        user.Role = role;
         user.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         return RedirectToAction(nameof(Index));

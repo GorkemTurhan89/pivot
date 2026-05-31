@@ -31,6 +31,7 @@ public class PivotDbContext : DbContext
             b.Property(u => u.Username).HasMaxLength(64).IsRequired();
             b.Property(u => u.Email).HasMaxLength(256).IsRequired();
             b.Property(u => u.PasswordHash).HasMaxLength(512).IsRequired();
+            b.Property(u => u.Role).HasMaxLength(32).IsRequired();
             b.HasIndex(u => u.Username).IsUnique();
             b.HasIndex(u => u.Email).IsUnique();
         });
