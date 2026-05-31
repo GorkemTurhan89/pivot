@@ -31,6 +31,14 @@
                             <a class="nav-link text-dark" asp-area="" asp-controller="Search" asp-action="Index" asp-route-fresh="1">Paket Arama</a>
                         </li>
                     </ul>
+                    @if (User?.Identity?.IsAuthenticated == true)
+                    {
+                        <form method="post" asp-controller="Auth" asp-action="Logout" class="d-flex align-items-center">
+                            @Html.AntiForgeryToken()
+                            <span class="navbar-text me-2 small text-muted">@User.Identity!.Name</span>
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Çıkış</button>
+                        </form>
+                    }
                 </div>
             </div>
         </nav>
