@@ -76,13 +76,15 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// Migration + super admin seed her ortamda koşsun (idempotent: super admin varsa atlanır).
+// Mock katalog seed'i artık burada DEĞİL — sadece schema + initial admin.
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<PivotDbContext>();
     await SeedData.InitializeAsync(db);
 }
-else
+
+if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
