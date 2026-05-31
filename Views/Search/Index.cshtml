@@ -39,17 +39,31 @@
     </div>
 
     <div class="col-md-3">
-        <label for="startDate" class="form-label">Kayıt Tarihi</label>
-        <input type="date" id="startDate" class="form-control"
-               value="@DateTime.Today.ToString("yyyy-MM-dd")" disabled />
+        <label for="startDateText" class="form-label">Kayıt Tarihi</label>
+        <div class="input-group">
+            <input type="text" id="startDateText" class="form-control"
+                   placeholder="GG/AA/YYYY" inputmode="numeric" maxlength="10"
+                   value="@DateTime.Today.ToString("dd/MM/yyyy")" disabled autocomplete="off" />
+            <span id="startDatePickerBtn" class="input-group-text position-relative"
+                  role="button" tabindex="0" style="cursor:pointer;user-select:none;" title="Takvimden seç">
+                📅
+                <input type="date" id="startDate"
+                       value="@DateTime.Today.ToString("yyyy-MM-dd")" disabled
+                       aria-hidden="true" tabindex="-1"
+                       style="position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none;border:0;padding:0;margin:0;" />
+            </span>
+        </div>
     </div>
 
     <div class="col-md-3">
         <label for="lengthFilter" class="form-label">Uzunluk (hafta)</label>
-        <input type="number" id="lengthFilter" class="form-control" list="lengthOptions"
-               placeholder="Tümü" min="1" disabled autocomplete="off" />
+        <div class="input-group">
+            <input type="number" id="lengthFilter" class="form-control" list="lengthOptions"
+                   placeholder="Tümü" min="1" disabled autocomplete="off" />
+            <button type="button" id="lengthSearchBtn" class="btn btn-outline-primary" disabled>Ara</button>
+        </div>
         <datalist id="lengthOptions"></datalist>
-        <small class="form-text text-muted">Listeden seç veya rakam yazıp Enter</small>
+        <small class="form-text text-muted">Listeden seç veya rakam yazıp Enter / Ara</small>
     </div>
 </form>
 
@@ -66,15 +80,48 @@
             const citySel = document.getElementById('citySelect');
             const schoolSel = document.getElementById('schoolSelect');
             const programSel = document.getElementById('programSelect');
-            const startDate = document.getElementById('startDate');
+            const startDate = document.getElementById('startDate');                  // hidden, yyyy-MM-dd (source of truth)
+            const startDateText = document.getElementById('startDateText');          // visible, GG/AA/YYYY
+            const startDatePickerBtn = document.getElementById('startDatePickerBtn');
             const lengthFilter = document.getElementById('lengthFilter');
+            const lengthSearchBtn = document.getElementById('lengthSearchBtn');
             const lengthOptions = document.getElementById('lengthOptions');
             const results = document.getElementById('resultsContainer');
+            // Son uygulanan filtre değeri — buton sadece input bundan farkıysa aktif.
+            let lastAppliedLength = '';
 
             let allPlans = [];
             // Kayıt tarihi default'u bugün; cascading değişimlerde sıfırlanmamalı.
             const todayStr = new Date().toISOString().slice(0, 10);
-            if (!startDate.value) startDate.value = todayStr;
+
+            const pad2d = n => String(n).padStart(2, '0');
+            function fmtTr(yyyyMmDd) {
+                if (!yyyyMmDd) return '';
+                const [y, m, d] = yyyyMmDd.split('-');
+                return `${d}/${m}/${y}`;
+            }
+            function parseTr(ggAaYyyy) {
+                const match = String(ggAaYyyy ?? '').trim().match(/^(\d{2})[\/\-.](\d{2})[\/\-.](\d{4})$/);
+                if (!match) return null;
+                const d = parseInt(match[1], 10);
+                const m = parseInt(match[2], 10);
+                const y = parseInt(match[3], 10);
+                const dt = new Date(y, m - 1, d);
+                if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+                return `${y}-${pad2d(m)}-${pad2d(d)}`;
+            }
+            // Hem gizli date input'u hem görünür text input'u birlikte günceller.
+            function setStartDate(yyyyMmDd) {
+                startDate.value = yyyyMmDd;
+                startDateText.value = fmtTr(yyyyMmDd);
+            }
+            function setStartDateDisabled(isDisabled) {
+                startDate.disabled = isDisabled;
+                startDateText.disabled = isDisabled;
+            }
+
+            if (!startDate.value) setStartDate(todayStr);
+            else if (!startDateText.value) startDateText.value = fmtTr(startDate.value);
 
             // ?fresh=1 ile geldiyse cart oturumunu temizle (lead hariç — varsa kalsın,
             // yeni paket arama aynı lead'e bağlanır).
@@ -116,6 +163,13 @@
                 lengthFilter.value = '';
                 lengthFilter.disabled = true;
                 lengthOptions.innerHTML = '';
+                lastAppliedLength = '';
+                lengthSearchBtn.disabled = true;
+            }
+
+            function syncSearchBtn() {
+                lengthSearchBtn.disabled = lengthFilter.disabled
+                    || lengthFilter.value.trim() === lastAppliedLength;
             }
 
             function clearAll() {
@@ -128,8 +182,8 @@
                 resetSelect(citySel, '-- Şehir yükleniyor... --');
                 resetSelect(schoolSel, '-- Önce şehir seçiniz --');
                 resetSelect(programSel, '-- Önce okul seçiniz --');
-                startDate.value = todayStr;
-                startDate.disabled = true;
+                setStartDate(todayStr);
+                setStartDateDisabled(true);
                 clearAll();
                 if (!countrySel.value) {
                     resetSelect(citySel, '-- Önce ülke seçiniz --');
@@ -142,8 +196,8 @@
             citySel.addEventListener('change', async () => {
                 resetSelect(schoolSel, '-- Okul yükleniyor... --');
                 resetSelect(programSel, '-- Önce okul seçiniz --');
-                startDate.value = todayStr;
-                startDate.disabled = true;
+                setStartDate(todayStr);
+                setStartDateDisabled(true);
                 clearAll();
                 if (!citySel.value) {
                     resetSelect(schoolSel, '-- Önce şehir seçiniz --');
@@ -155,8 +209,8 @@
 
             schoolSel.addEventListener('change', async () => {
                 resetSelect(programSel, '-- Program yükleniyor... --');
-                startDate.value = todayStr;
-                startDate.disabled = true;
+                setStartDate(todayStr);
+                setStartDateDisabled(true);
                 clearAll();
                 if (!schoolSel.value) {
                     resetSelect(programSel, '-- Önce okul seçiniz --');
@@ -167,8 +221,8 @@
             });
 
             programSel.addEventListener('change', () => {
-                startDate.value = todayStr;
-                startDate.disabled = !programSel.value;
+                setStartDate(todayStr);
+                setStartDateDisabled(!programSel.value);
                 clearAll();
                 // Tarih zaten bugünle dolu; programa girilir girilmez sorguyu hemen tetikle (debounce yok).
                 if (programSel.value) runPaymentPlanSearch();
@@ -188,12 +242,50 @@
                 renderResults(allPlans);
             };
 
+            // Native picker'dan tarih seçilince görünür text input'u da güncelle.
+            startDate.addEventListener('change', () => {
+                startDateText.value = fmtTr(startDate.value);
+            });
             startDate.addEventListener('change', debounce(runPaymentPlanSearch, 600));
+
+            // Text input'a yazarken otomatik GG/AA/YYYY biçimle; geçerli olursa hidden'a yyyy-MM-dd yaz
+            // ve runPaymentPlanSearch'i tetiklemek için startDate'in change event'ini elle dispatch et.
+            startDateText.addEventListener('input', () => {
+                const digits = startDateText.value.replace(/\D/g, '').slice(0, 8);
+                let out = digits;
+                if (digits.length > 4) out = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+                else if (digits.length > 2) out = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                if (out !== startDateText.value) startDateText.value = out;
+
+                const iso = parseTr(startDateText.value);
+                if (iso && iso !== startDate.value) {
+                    startDate.value = iso;
+                    startDate.dispatchEvent(new Event('change'));
+                }
+            });
+
+            // Takvim ikonuna tıklanınca native picker'ı aç.
+            function openStartDatePicker() {
+                if (startDate.disabled) return;
+                if (typeof startDate.showPicker === 'function') {
+                    try { startDate.showPicker(); return; } catch { /* fall through */ }
+                }
+                startDate.focus();
+            }
+            startDatePickerBtn.addEventListener('click', openStartDatePicker);
+            startDatePickerBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openStartDatePicker();
+                }
+            });
             // BÜYÜK GEÇİŞ (2026-05-30): bant modeli. lengthFilter "hafta" girdisi olarak çalışır;
             // bandı (MinWeek<=N<=MaxWeek) eşleyen plan(lar) gösterilir.
 
             function applyLengthFilter() {
                 const v = lengthFilter.value.trim();
+                lastAppliedLength = v;
+                lengthSearchBtn.disabled = true;
                 if (!v) {
                     renderResults(allPlans);
                     return;
@@ -206,6 +298,7 @@
                 renderResults(allPlans.filter(p => p.minWeek <= n && n <= p.maxWeek));
             }
 
+            lengthFilter.addEventListener('input', syncSearchBtn);
             lengthFilter.addEventListener('change', applyLengthFilter);
             lengthFilter.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
@@ -213,6 +306,7 @@
                     applyLengthFilter();
                 }
             });
+            lengthSearchBtn.addEventListener('click', applyLengthFilter);
 
             results.addEventListener('click', (e) => {
                 const btn = e.target.closest('.select-plan');
