@@ -10,8 +10,14 @@
     <p class="text-muted">Yükleniyor...</p>
 </div>
 
-<div class="mt-4">
+<div class="mt-4 d-flex flex-wrap gap-2">
     <a href="/Search/ExtraServices" class="btn btn-outline-secondary">← Ek hizmetlere (vize/uçak) dön</a>
+    <div class="ms-auto d-flex gap-2" id="quoteActions" style="display:none !important;">
+        <a id="quoteView" class="btn btn-primary" target="_blank" rel="noopener">PDF Görüntüle</a>
+        <a id="quoteDownload" class="btn btn-outline-primary" target="_blank" rel="noopener">PDF İndir</a>
+        <button id="quoteEmail" type="button" class="btn btn-outline-secondary" disabled
+                title="Yakında">Email At (yakında)</button>
+    </div>
 </div>
 
 @section Scripts {
@@ -137,7 +143,18 @@
                     </table>`;
             }
 
-            load();
+            // Quote butonlarını cartGuid varsa aktive et: GetCart çağrısı snapshot persist'i
+            // tetikledikten sonra link'ler hazır olmalı.
+            async function init() {
+                await load();
+                const lead = JSON.parse(localStorage.getItem('pivot.lead') ?? 'null');
+                if (lead && lead.cartGuid) {
+                    document.getElementById('quoteView').href = `/Search/Quote?cartGuid=${lead.cartGuid}`;
+                    document.getElementById('quoteDownload').href = `/Search/Quote?cartGuid=${lead.cartGuid}&print=true`;
+                    document.getElementById('quoteActions').style.display = '';
+                }
+            }
+            init();
         })();
     </script>
 }

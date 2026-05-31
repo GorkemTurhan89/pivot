@@ -551,4 +551,130 @@ public class SearchController : Controller
 
         return Json(vm);
     }
+
+    // Fiyat teklifi (Quote) — Cart sayfasından "PDF Görüntüle" ya da "PDF İndir" ile çağrılır.
+    // print=true ise view JS ile window.print() tetikler (browser → Save as PDF).
+    [HttpGet]
+    public async Task<IActionResult> Quote(Guid cartGuid, bool print = false)
+    {
+        var cart = await _db.CartDetails
+            .AsNoTracking()
+            .Include(c => c.Member)
+            .Include(c => c.ChoosenPlans)
+            .FirstOrDefaultAsync(c => c.CartGuid == cartGuid);
+        if (cart == null) return NotFound();
+
+        var mainPlan = cart.ChoosenPlans.FirstOrDefault(p => p.IsMain);
+        string schoolName = "", programName = "", cityName = "", countryName = "";
+        if (mainPlan?.PaymentPlanId is int mainPlanId)
+        {
+            var info = await _db.PaymentPlans.AsNoTracking()
+                .Where(p => p.Id == mainPlanId)
+                .Select(p => new
+                {
+                    School = p.School!.Name,
+                    Program = p.Program != null ? p.Program.Name : null,
+                    City = p.School!.City!.Name,
+                    Country = p.School!.City!.Country!.Name
+                })
+                .FirstOrDefaultAsync();
+            if (info != null)
+            {
+                schoolName = info.School;
+                programName = info.Program ?? "";
+                cityName = info.City;
+                countryName = info.Country;
+            }
+        }
+
+        var currency = mainPlan?.Currency
+            ?? cart.ChoosenPlans.FirstOrDefault()?.Currency
+            ?? "";
+
+        var vm = new QuoteViewModel
+        {
+            CartGuid = cartGuid,
+            CreatedAt = cart.UpdateDate,
+            AutoPrint = print,
+
+            CustomerFullName = $"{cart.Member.FirstName} {cart.Member.LastName}".Trim(),
+            CustomerEmail = cart.Member.Email,
+            CustomerPhone = cart.Member.PhoneNumber,
+            CustomerNationality = cart.Member.Nationality,
+            CustomerBirthday = cart.Member.Birthday,
+
+            SalesRepName = User.Identity?.Name ?? "",
+            SalesRepEmail = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value,
+            SalesRepRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "",
+
+            SchoolName = schoolName,
+            CityName = cityName,
+            CountryName = countryName,
+            ProgramName = programName,
+            MainWeeks = mainPlan?.SelectedWeeks ?? 0,
+            Currency = currency,
+
+            GrandTotal = cart.TotalPaymentPrice
+        };
+
+        // Kategorize: Ana paket + non-konaklama addon'lar => Course. Konaklama/Supplement => Accommodation.
+        // Vize/Uçak veya PaymentPlanId == null (manuel) => Extras.
+        bool IsExtra(ChoosenPlanDetail p) =>
+            p.PaymentPlanId == null
+            || string.Equals(p.Category, "Vize", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p.Category, "Vize Ücreti", StringComparison.OrdinalIgnoreCase)
+            || (p.Category?.Contains("Uçak", StringComparison.OrdinalIgnoreCase) ?? false);
+        bool IsAccommodation(ChoosenPlanDetail p) =>
+            string.Equals(p.Category, "Konaklama", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p.Category, "Supplement", StringComparison.OrdinalIgnoreCase);
+
+        if (mainPlan != null)
+        {
+            vm.CourseLines.Add(new QuoteLine
+            {
+                Label = mainPlan.Name,
+                Detail = mainPlan.SelectedWeeks > 0 ? $"{mainPlan.SelectedWeeks} hafta" : null,
+                Amount = mainPlan.LineAmount,
+                Currency = mainPlan.Currency
+            });
+            if (mainPlan.RegistrationFee is decimal reg && reg > 0m)
+            {
+                vm.CourseLines.Add(new QuoteLine
+                {
+                    Label = "Kayıt Ücreti",
+                    Amount = reg,
+                    Currency = mainPlan.Currency
+                });
+            }
+        }
+
+        foreach (var a in cart.ChoosenPlans.Where(p => !p.IsMain))
+        {
+            var target = IsAccommodation(a)
+                ? vm.AccommodationLines
+                : IsExtra(a) ? vm.ExtraLines : vm.CourseLines;
+
+            target.Add(new QuoteLine
+            {
+                Label = a.Name + (a.IsMandatory ? " (Zorunlu)" : ""),
+                Detail = a.SelectedWeeks > 0 ? $"{a.SelectedWeeks} hafta" : a.Category,
+                Amount = a.LineAmount,
+                Currency = a.Currency
+            });
+            if (a.RegistrationFee is decimal addonReg && addonReg > 0m)
+            {
+                target.Add(new QuoteLine
+                {
+                    Label = $"↳ {a.Name} – Yerleştirme",
+                    Amount = addonReg,
+                    Currency = a.Currency
+                });
+            }
+        }
+
+        vm.CourseTotal = vm.CourseLines.Sum(l => l.Amount);
+        vm.AccommodationTotal = vm.AccommodationLines.Sum(l => l.Amount);
+
+        return View(vm);
+    }
 }
