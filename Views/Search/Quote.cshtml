@@ -86,22 +86,12 @@
     </header>
 
     <section class="content">
-      <div class="parties">
-        <div class="party">
-          <h4>Müşteri</h4>
-          <div class="nm">@Model.CustomerFullName</div>
-          <div class="row"><strong>E-posta:</strong> @(Model.CustomerEmail ?? "—")</div>
-          <div class="row"><strong>Telefon:</strong> @(Model.CustomerPhone ?? "—")</div>
-          <div class="row"><strong>Uyruk:</strong> @(Model.CustomerNationality ?? "—")</div>
-          <div class="row"><strong>Doğum:</strong> @DateOnlyTr(Model.CustomerBirthday)</div>
-        </div>
-        <div class="party">
-          <h4>Satış Temsilcisi</h4>
-          <div class="nm">@Model.SalesRepName</div>
-          <div class="row"><strong>E-posta:</strong> @(Model.SalesRepEmail ?? "—")</div>
-          <div class="row"><strong>Rol:</strong> @Model.SalesRepRole</div>
-          <div class="row"><strong>Teklif #:</strong> @Model.CartGuid.ToString().Substring(0, 8).ToUpper()</div>
-        </div>
+      <div class="party mb-3">
+        <h4>Müşteri</h4>
+        <div class="nm">@Model.CustomerFullName</div>
+        <div class="row"><strong>Telefon:</strong> @(Model.CustomerPhone ?? "—")</div>
+        <div class="row"><strong>Uyruk:</strong> @(Model.CustomerNationality ?? "—")</div>
+        <div class="row"><strong>Teklif #:</strong> @Model.CartGuid.ToString().Substring(0, 8).ToUpper()</div>
       </div>
 
       <div class="info-card">

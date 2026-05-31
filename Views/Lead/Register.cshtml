@@ -1,6 +1,7 @@
 @{
     ViewData["Title"] = "Kayıt";
     var maxDate = DateTime.Today.ToString("yyyy-MM-dd");
+    var todayDdMmYyyy = DateTime.Today.ToString("dd/MM/yyyy");
 }
 
 <h1 class="mb-3">Yeni Kayıt</h1>
@@ -22,11 +23,11 @@
         <div class="input-group">
             <input type="text" id="birthday" class="form-control" required
                    placeholder="GG/AA/YYYY" inputmode="numeric" autocomplete="bday"
-                   maxlength="10" />
+                   maxlength="10" value="@todayDdMmYyyy" />
             <span id="birthdayPickerBtn" class="input-group-text position-relative"
                   role="button" tabindex="0" style="cursor:pointer;user-select:none;" title="Takvimden seç">
                 📅
-                <input type="date" id="birthdayPicker" max="@maxDate" aria-hidden="true" tabindex="-1"
+                <input type="date" id="birthdayPicker" max="@maxDate" value="@maxDate" aria-hidden="true" tabindex="-1"
                        style="position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none;border:0;padding:0;margin:0;" />
             </span>
         </div>
@@ -40,7 +41,6 @@
     <div class="col-md-4">
         <label for="nationality" class="form-label">Uyruk <span class="text-danger">*</span></label>
         <select id="nationality" class="form-select" required>
-            <option value="">— Seçiniz —</option>
             @foreach (var n in new[] {
                 "Türkiye", "KKTC", "Almanya", "Hollanda", "Avusturya", "Belçika",
                 "Fransa", "İngiltere", "Amerika Birleşik Devletleri", "Kanada",
@@ -51,7 +51,14 @@
                 "Hindistan", "Pakistan", "Çin", "Japonya", "Güney Kore", "Diğer"
             })
             {
-                <option value="@n">@n</option>
+                if (n == "Türkiye")
+                {
+                    <option value="@n" selected>@n</option>
+                }
+                else
+                {
+                    <option value="@n">@n</option>
+                }
             }
         </select>
         <div class="invalid-feedback">Uyruk seçimi zorunludur.</div>
