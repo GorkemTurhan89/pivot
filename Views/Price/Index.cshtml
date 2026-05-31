@@ -1,0 +1,178 @@
+@model IEnumerable<Pivot.Models.ViewModels.LookupItem>
+@{
+    ViewData["Title"] = "Fiyatlar";
+}
+
+<h1 class="mb-4">Fiyatlar</h1>
+
+@if (TempData["Saved"] is string saved)
+{
+    <div class="alert alert-success">@saved</div>
+}
+
+<form id="filterForm" class="row g-3 mb-3">
+    <div class="col-md-3">
+        <label for="countrySelect" class="form-label">Ülke</label>
+        <select id="countrySelect" class="form-select">
+            <option value="">-- Ülke seçiniz --</option>
+            @foreach (var c in Model)
+            {
+                <option value="@c.Id">@c.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label for="citySelect" class="form-label">Şehir</label>
+        <select id="citySelect" class="form-select" disabled>
+            <option value="">-- Önce ülke seçiniz --</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label for="schoolSelect" class="form-label">Okul</label>
+        <select id="schoolSelect" class="form-select" disabled>
+            <option value="">-- Önce şehir seçiniz --</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label for="typeFilter" class="form-label">Tip</label>
+        <select id="typeFilter" class="form-select" disabled>
+            <option value="">Tümü</option>
+            <option value="main">Sadece ana paket</option>
+            <option value="addon">Sadece ek paket</option>
+        </select>
+    </div>
+</form>
+
+<div id="resultsContainer">
+    <p class="text-muted">Okul seçtiğinizde planlar burada listelenecek.</p>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const $ = id => document.getElementById(id);
+            const countrySel = $('countrySelect');
+            const citySel = $('citySelect');
+            const schoolSel = $('schoolSelect');
+            const typeSel = $('typeFilter');
+            const results = $('resultsContainer');
+
+            let allPlans = [];
+
+            function resetSelect(sel, placeholder) {
+                sel.innerHTML = `<option value="">${placeholder}</option>`;
+                sel.disabled = true;
+            }
+            function populateSelect(sel, items, placeholder) {
+                sel.innerHTML = `<option value="">${placeholder}</option>` +
+                    items.map(i => `<option value="${i.id}">${i.name}</option>`).join('');
+                sel.disabled = false;
+            }
+            async function fetchJson(url) {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            }
+            function clearResults() {
+                allPlans = [];
+                results.innerHTML = '<p class="text-muted">Okul seçtiğinizde planlar burada listelenecek.</p>';
+                typeSel.value = '';
+                typeSel.disabled = true;
+            }
+
+            countrySel.addEventListener('change', async () => {
+                resetSelect(citySel, '-- Şehir yükleniyor... --');
+                resetSelect(schoolSel, '-- Önce şehir seçiniz --');
+                clearResults();
+                if (!countrySel.value) {
+                    resetSelect(citySel, '-- Önce ülke seçiniz --');
+                    return;
+                }
+                const cities = await fetchJson(`/Search/GetCities?countryId=${countrySel.value}`);
+                populateSelect(citySel, cities, '-- Şehir seçiniz --');
+            });
+
+            citySel.addEventListener('change', async () => {
+                resetSelect(schoolSel, '-- Okul yükleniyor... --');
+                clearResults();
+                if (!citySel.value) {
+                    resetSelect(schoolSel, '-- Önce şehir seçiniz --');
+                    return;
+                }
+                const schools = await fetchJson(`/Search/GetSchools?cityId=${citySel.value}`);
+                populateSelect(schoolSel, schools, '-- Okul seçiniz --');
+            });
+
+            schoolSel.addEventListener('change', async () => {
+                clearResults();
+                if (!schoolSel.value) return;
+                results.innerHTML = '<p class="text-muted">Aranıyor...</p>';
+                allPlans = await fetchJson(`/Price/GetPlans?schoolId=${schoolSel.value}`);
+                typeSel.disabled = false;
+                render();
+            });
+
+            typeSel.addEventListener('change', render);
+
+            const money = v => v == null ? '—' : Number(v).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const text = v => v == null || v === '' ? '—' : v;
+            const dateStr = v => v == null ? '—' : v;
+            const yesNo = v => v ? '<span class="badge bg-success">Aktif</span>' : '<span class="badge bg-secondary">Pasif</span>';
+
+            function render() {
+                if (!allPlans || allPlans.length === 0) {
+                    results.innerHTML = '<div class="alert alert-warning">Bu okula bağlı plan bulunamadı.</div>';
+                    return;
+                }
+                const filter = typeSel.value;
+                let list = allPlans;
+                if (filter === 'main') list = list.filter(p => !p.isAdditional);
+                else if (filter === 'addon') list = list.filter(p => p.isAdditional);
+
+                if (list.length === 0) {
+                    results.innerHTML = '<div class="alert alert-warning">Filtreye uyan plan yok.</div>';
+                    return;
+                }
+
+                const rows = list.map(p => {
+                    const typeBadge = p.isAdditional
+                        ? `<span class="badge bg-info text-dark">Ek</span>${p.category ? ` <small class="text-muted">${p.category}</small>` : ''}`
+                        : '<span class="badge bg-primary">Ana</span>';
+                    const weeklyOrTotal = p.priceType === 'Weekly'
+                        ? `${money(p.weeklyListFee)}${p.weeklyPromoFee != null ? ` <small class="text-success">(promo ${money(p.weeklyPromoFee)})</small>` : ''} / hafta`
+                        : `${money(p.totalListFee)}${p.totalPromoFee != null ? ` <small class="text-success">(promo ${money(p.totalPromoFee)})</small>` : ''} sabit`;
+                    return `
+                    <tr>
+                        <td>${p.id}</td>
+                        <td>${text(p.name)}</td>
+                        <td>${text(p.programName)}</td>
+                        <td>${typeBadge}</td>
+                        <td class="text-end">${p.minWeek}–${p.maxWeek}</td>
+                        <td>${weeklyOrTotal} ${p.currency}</td>
+                        <td class="text-end">${money(p.registrationFee)}</td>
+                        <td>${yesNo(p.isActive)}</td>
+                        <td><a href="/Price/Edit/${p.id}" class="btn btn-sm btn-outline-primary">Düzenle</a></td>
+                    </tr>`;
+                }).join('');
+
+                results.innerHTML = `
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Id</th>
+                                <th>Ad</th>
+                                <th>Program</th>
+                                <th>Tip</th>
+                                <th class="text-end">Hafta</th>
+                                <th>Birim Fiyat</th>
+                                <th class="text-end">Kayıt</th>
+                                <th>Durum</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>`;
+            }
+        })();
+    </script>
+}

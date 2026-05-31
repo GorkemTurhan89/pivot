@@ -1,0 +1,104 @@
+@model Pivot.Models.Entities.PaymentPlan
+@{
+    ViewData["Title"] = "Fiyat Düzenle";
+    var currency = ViewData["Currency"] as string ?? "";
+    string Money(decimal? v) => v?.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) ?? "";
+    string DateIso(DateOnly? d) => d?.ToString("yyyy-MM-dd") ?? "";
+}
+
+<h1 class="mb-3">Fiyat düzenle <small class="text-muted">#@Model.Id</small></h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-2 small">
+            <div class="col-md-4"><strong>Ad:</strong> @Model.Name</div>
+            <div class="col-md-4"><strong>Okul:</strong> @(Model.School?.Name ?? "—")</div>
+            <div class="col-md-4"><strong>Program:</strong> @(Model.Program?.Name ?? "—")</div>
+            <div class="col-md-3"><strong>Hafta Bandı:</strong> @Model.MinWeek – @Model.MaxWeek</div>
+            <div class="col-md-3"><strong>Fiyat Tipi:</strong> @Model.PriceType</div>
+            <div class="col-md-3"><strong>Para Birimi:</strong> @currency</div>
+            <div class="col-md-3"><strong>Tip:</strong> @(Model.IsAdditional ? "Ek Paket" : "Ana Paket")@(string.IsNullOrEmpty(Model.Category) ? "" : $" / {Model.Category}")</div>
+        </div>
+    </div>
+</div>
+
+<form method="post" asp-action="Edit" asp-route-id="@Model.Id" class="row g-3" novalidate>
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="text-danger small mb-2"></div>
+
+    @if (Model.PriceType == Pivot.Models.Entities.PriceType.Weekly)
+    {
+        <div class="col-md-6">
+            <label class="form-label">Haftalık Liste Fiyatı (@currency)</label>
+            <input type="number" step="0.01" name="WeeklyListFee" class="form-control"
+                   value="@Money(Model.WeeklyListFee)" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Haftalık Promosyon Fiyatı (@currency)</label>
+            <input type="number" step="0.01" name="WeeklyPromoFee" class="form-control"
+                   value="@Money(Model.WeeklyPromoFee)" />
+        </div>
+    }
+    else
+    {
+        <div class="col-md-6">
+            <label class="form-label">Sabit Toplam Liste (@currency)</label>
+            <input type="number" step="0.01" name="TotalListFee" class="form-control"
+                   value="@Money(Model.TotalListFee)" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Sabit Toplam Promosyon (@currency)</label>
+            <input type="number" step="0.01" name="TotalPromoFee" class="form-control"
+                   value="@Money(Model.TotalPromoFee)" />
+        </div>
+    }
+
+    @* Geçerli olmayan alanları da gönder ki backend null değil mevcut değeri korusun;
+       PriceType'a göre alakasız olanları gizli input ile mevcut değeri geçiyoruz. *@
+    @if (Model.PriceType != Pivot.Models.Entities.PriceType.Weekly)
+    {
+        <input type="hidden" name="WeeklyListFee" value="@Money(Model.WeeklyListFee)" />
+        <input type="hidden" name="WeeklyPromoFee" value="@Money(Model.WeeklyPromoFee)" />
+    }
+    else
+    {
+        <input type="hidden" name="TotalListFee" value="@Money(Model.TotalListFee)" />
+        <input type="hidden" name="TotalPromoFee" value="@Money(Model.TotalPromoFee)" />
+    }
+
+    <div class="col-md-4">
+        <label class="form-label">Kayıt Ücreti (@currency)</label>
+        <input type="number" step="0.01" name="RegistrationFee" class="form-control"
+               value="@Money(Model.RegistrationFee)" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Üyelik Ücreti (@currency)</label>
+        <input type="number" step="0.01" name="MembershipFee" class="form-control"
+               value="@Money(Model.MembershipFee)" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Promoted Fee (@currency)</label>
+        <input type="number" step="0.01" name="PromotedFee" class="form-control"
+               value="@Money(Model.PromotedFee)" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label">Promo Geçerlilik Başlangıç</label>
+        <input type="date" name="PromoValidFrom" class="form-control" value="@DateIso(Model.PromoValidFrom)" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Promo Geçerlilik Bitiş</label>
+        <input type="date" name="PromoValidUntil" class="form-control" value="@DateIso(Model.PromoValidUntil)" />
+    </div>
+    <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="IsActive" name="IsActive" value="true" @(Model.IsActive ? "checked" : "") />
+            <label class="form-check-label" for="IsActive">Aktif</label>
+        </div>
+    </div>
+
+    <div class="col-12 mt-4">
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+        <a asp-action="Index" class="btn btn-secondary">İptal</a>
+    </div>
+</form>
