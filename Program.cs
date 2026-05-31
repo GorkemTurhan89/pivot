@@ -78,10 +78,20 @@ var app = builder.Build();
 
 // Migration + super admin seed her ortamda koşsun (idempotent: super admin varsa atlanır).
 // Mock katalog seed'i artık burada DEĞİL — sadece schema + initial admin.
+// Fail-soft: DB başlangıçta erişilemezse app ayağa kalksın, hata log'a düşsün
+// (aksi halde login sayfası bile açılmaz, debugging zorlaşır).
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<PivotDbContext>();
-    await SeedData.InitializeAsync(db);
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        await SeedData.InitializeAsync(db);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Startup seed/migrate başarısız; app yine de açılacak. Login muhtemelen çalışmayacak.");
+    }
 }
 
 if (!app.Environment.IsDevelopment())
